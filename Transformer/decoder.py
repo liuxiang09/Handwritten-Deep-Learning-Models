@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import math
 from config import *
-from FeedForward import FeedForward
-from MultiHeadAttention import MultiHeadAttention
-from PositionalEncoding import TokenEmbedding, PositionalEncoding
+from feedforward import FeedForward
+from multiheadattention import MultiHeadAttention
+from positionalencoding import TokenEmbedding, PositionalEncoding
 
 
 class DecoderLayer(nn.Module):
@@ -76,7 +76,7 @@ class DecoderLayer(nn.Module):
         ffn_output = self.feed_forward(trg) # ffn_output shape: (batch_size, seq_len_trg, d_model)
         ffn_output = self.dropout3(ffn_output) 
         dec_output = self.norm3(residual + ffn_output) # decoder_output shape: (batch_size, seq_len_trg, d_model)
-        print(f"{'dec_output:':<{print_width}}{dec_output.shape}")
+        # print(f"{'dec_output:':<{print_width}}{dec_output.shape}")
         return dec_output, masked_self_attn_weights, cross_attn_weights
 
 class Decoder(nn.Module):

@@ -27,7 +27,7 @@ class TokenEmbedding(nn.Module):
             torch.Tensor: 嵌入后的张量，形状为 [seq_len, batch_size, d_model]
         """
         emb_x = self.embedding(x.long()) * math.sqrt(self.d_model)  # 词嵌入
-        print(f"{'token_embedding:':<{print_width}}{emb_x.shape}") # 词嵌入形状
+        # print(f"{'token_embedding:':<{print_width}}{emb_x.shape}") # 词嵌入形状
         return emb_x
 
 class PositionalEncoding(nn.Module):
@@ -63,5 +63,5 @@ class PositionalEncoding(nn.Module):
             torch.Tensor: 经过位置编码的张量
         """
         x = x + self.pe[:x.size(0), :]
-        print(f"{'pos_embedding:':<{print_width}}{x.shape}") # 位置编码形状
+        # print(f"{'pos_embedding:':<{print_width}}{x.shape}") # 位置编码形状
         return self.dropout(x)

@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import math
 from config import *
-from FeedForward import FeedForward
-from MultiHeadAttention import MultiHeadAttention
-from PositionalEncoding import TokenEmbedding, PositionalEncoding
+from feedforward import FeedForward
+from multiheadattention import MultiHeadAttention
+from positionalencoding import TokenEmbedding, PositionalEncoding
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model: int, n_head: int, d_ff: int, dropout: float):
@@ -44,7 +44,7 @@ class EncoderLayer(nn.Module):
         residual = normalized_attn_output
         ffn_output = self.feed_forward(normalized_attn_output)
         enc_output = self.norm2(self.dropout2(ffn_output) + residual)
-        print(f"{'enc_output:':<{print_width}}{enc_output.shape}")
+        # print(f"{'enc_output:':<{print_width}}{enc_output.shape}")
         return enc_output, attn_weights
 
 class Encoder(nn.Module):

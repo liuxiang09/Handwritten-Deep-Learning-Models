@@ -27,6 +27,7 @@ def check_environment():
         'triton',
         'torchvision',
         'torchaudio',
+        'torchtext',
     ]
     
     for package in packages:
