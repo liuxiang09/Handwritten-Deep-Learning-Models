@@ -4,16 +4,14 @@ from torch.utils.data import DataLoader
 import torch
 import torch.nn as nn
 from tqdm import tqdm # 导入 tqdm 库
+import yaml
 
+def load_config(config_path):
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+    
+config = load_config('VGG/configs/vgg_config.yaml')
 
-
-cfg = {
-    'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-    'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
-    'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
-    'my_VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M'],
-    'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
-}
 
 transforms = transforms.Compose([
     transforms.Resize((224, 224)), # 调整大小
@@ -65,5 +63,6 @@ for epoch in range(num_epochs):
     print(f"Epoch [{epoch+1}/{num_epochs}] 训练完成，平均损失: {epoch_loss:.4f}")
 
 # 保存模型
-torch.save(model.state_dict(), 'vgg16_cifar10_epoch_5.pth')
-print("模型已保存到 vgg16_cifar10_trained.pth")
+save_path = f'vgg16_cifar10_epoch_{num_epochs}.pth'
+torch.save(model.state_dict(), save_path)
+print(f"模型已保存到 {save_path}")
