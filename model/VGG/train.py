@@ -10,7 +10,7 @@ def load_config(config_path):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
     
-config = load_config('VGG/configs/vgg_config.yaml')
+config = load_config('model/VGG/configs/train_config.yaml')
 
 
 transforms = transforms.Compose([

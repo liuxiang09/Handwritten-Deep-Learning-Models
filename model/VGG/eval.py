@@ -6,8 +6,6 @@ from tqdm import tqdm # 导入 tqdm 库
 import yaml
 
 
-
-
 transforms = transforms.Compose([
         transforms.Resize((224, 224)), # 调整大小
         transforms.ToTensor(), # 转换为张量
@@ -20,7 +18,7 @@ print(len(test_cifar10))
 
 # 加载模型
 model = VGG('VGG16', num_classes=10)  # 使用VGG16模型
-model.load_state_dict(torch.load("VGG/vgg16_cifar10_epoch_5.pth"))  # 加载模型参数
+model.load_state_dict(torch.load("model/VGG/checkpoints/vgg16_cifar10_epoch_5.pth"))  # 加载模型参数
 
 # 使用torchvision.models中的VGG16模型
 # model = torchvision.models.vgg16(pretrained=True)  # CIFAR-10有10个类别

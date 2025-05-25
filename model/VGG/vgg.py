@@ -4,7 +4,7 @@ import torch.nn as nn
 # 定义不同VGG变体的配置
 # M 表示 Max Pooling Layer
 # 数字表示该层卷积的输出通道数
-cfg = {
+_MODLE = {
     'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
@@ -23,7 +23,7 @@ class VGG(nn.Module):
             init_weights (bool): 是否初始化网络权重
         """
         super(VGG, self).__init__()
-        self.cfg = cfg[vgg_name] # 获取指定VGG变体的配置
+        self.cfg = _MODLE[vgg_name] # 获取指定VGG变体的配置
 
         # 构建卷积层部分 (features)
         # 输入通道默认为3 (RGB图像)
@@ -114,6 +114,7 @@ if __name__ == "__main__":
     model = VGG('VGG16', num_classes=10)  # 创建VGG16模型实例
     # 测试模型的前向传播
     x = torch.randn(1, 3, 224, 224)
+    print("模型输入形状:", x.shape)
     output = model(x)
     print("模型输出形状:", output.shape)  # 应该是 (1, 10)
     # 测试模型的参数数量
