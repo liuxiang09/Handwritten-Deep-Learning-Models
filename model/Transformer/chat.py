@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-# from Transformer import Transformer # 导入你的 Transformer 模型类
 from transformers import AutoTokenizer # 导入 Hugging Face 分词器
 from transformer import Transformer
 from config import *
@@ -17,16 +16,17 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # 如果你保存了自定义分词器，请从保存路径加载
 TOKENIZER_SAVE_DIR = "./my_custom_tokenizers" # 确保路径与你训练时保存的路径一致
 
-try:
-    tokenizer_de = AutoTokenizer.from_pretrained(f"{TOKENIZER_SAVE_DIR}/de_tokenizer")
-    tokenizer_en = AutoTokenizer.from_pretrained(f"{TOKENIZER_SAVE_DIR}/en_tokenizer")
-    print("已加载自定义分词器。")
-except Exception:
-    print("未能加载自定义分词器，尝试从预训练模型加载并添加特殊token。")
-    tokenizer_de = AutoTokenizer.from_pretrained("bert-base-german-cased")
-    tokenizer_en = AutoTokenizer.from_pretrained("bert-base-uncased")
-    tokenizer_de.add_special_tokens({'bos_token': '<sos>', 'eos_token': '<eos>'})
-    tokenizer_en.add_special_tokens({'bos_token': '<sos>', 'eos_token': '<eos>'})
+# try:
+#     tokenizer_de = AutoTokenizer.from_pretrained(f"{TOKENIZER_SAVE_DIR}/de_tokenizer")
+#     tokenizer_en = AutoTokenizer.from_pretrained(f"{TOKENIZER_SAVE_DIR}/en_tokenizer")
+#     print("已加载自定义分词器。")
+# except Exception:
+#     print("未能加载自定义分词器，尝试从预训练模型加载并添加特殊token。")
+print("加载自定义分词器")
+tokenizer_de = AutoTokenizer.from_pretrained("bert-base-german-cased")
+tokenizer_en = AutoTokenizer.from_pretrained("bert-base-uncased")
+tokenizer_de.add_special_tokens({'bos_token': '<sos>', 'eos_token': '<eos>'})
+tokenizer_en.add_special_tokens({'bos_token': '<sos>', 'eos_token': '<eos>'})
 
 # 3. 获取特殊 Token ID
 SRC_SOS_IDX = tokenizer_en.bos_token_id
@@ -57,7 +57,7 @@ model = Transformer(
 ).to(DEVICE)
 
 # 加载训练好的模型权重
-MODEL_PATH = 'Transformer/transformer_test_1.pth' # 确保文件名和路径正确
+MODEL_PATH = 'model/Transformer/transformer_test_1.pth' # 确保文件名和路径正确
 try:
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
     print(f"模型权重已从 {MODEL_PATH} 加载成功。")

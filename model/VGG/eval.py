@@ -1,7 +1,7 @@
 import torch
 import torchvision
 from torchvision import datasets, transforms
-from VGG import VGG
+from vgg import VGG
 from tqdm import tqdm # 导入 tqdm 库
 
 

@@ -1,18 +1,18 @@
 import torch
 
 # 模型超参数
-d_model = 512
+d_model = 256
 max_len = 128
-dropout = 0.05
-n_head = 8
-n_layer = 6
-d_ff = 2048
+dropout = 0.1
+n_head = 4
+n_layer = 3
+d_ff = 1024
 
 
 # 训练超参数
 batch_size = 64
-learning_rate = 0.0005
-num_epochs = 10
+learning_rate = 5e-4
+num_epochs = 50
 
 
 # 设备

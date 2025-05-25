@@ -28,7 +28,7 @@ class ScaledDotProductAttention(nn.Module):
         # k.transpose(-2, -1) 将 k 的最后两个维度交换，变成 (batch_size, n_head, d_k, seq_len_k)
         # 矩阵乘法结果: (batch_size, n_head, seq_len_q, seq_len_k)
         scores = torch.matmul(query, key.transpose(-2, -1))
-
+        
         # 2. 缩放
         # d_k 是 k 向量的维度（Q 和 K 的隐藏维度）
         d_k = query.size(-1)

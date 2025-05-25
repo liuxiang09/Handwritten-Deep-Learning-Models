@@ -3,8 +3,8 @@ import torch.nn as nn
 import math
 from config import *
 from feedforward import FeedForward
-from multiheadattention import MultiHeadAttention
-from positionalencoding import TokenEmbedding, PositionalEncoding
+from model.Transformer.multihead_attention import MultiHeadAttention
+from model.Transformer.positional_encoding import TokenEmbedding, PositionalEncoding
 
 
 class DecoderLayer(nn.Module):

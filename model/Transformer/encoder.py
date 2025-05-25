@@ -3,8 +3,8 @@ import torch.nn as nn
 import math
 from config import *
 from feedforward import FeedForward
-from multiheadattention import MultiHeadAttention
-from positionalencoding import TokenEmbedding, PositionalEncoding
+from model.Transformer.multihead_attention import MultiHeadAttention
+from model.Transformer.positional_encoding import TokenEmbedding, PositionalEncoding
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model: int, n_head: int, d_ff: int, dropout: float):
@@ -56,7 +56,7 @@ class Encoder(nn.Module):
         d_model (int): 模型的隐藏维度 (例如 512)
         n_head (int): 多头注意力的头数 (例如 8)
         d_ff (int): 前馈网络的内部隐藏维度 (例如 2048)
-        num_layers (int): 编码器层的数量 (N)
+        n_layer (int): 编码器层的数量 (N)
         dropout_p (float): dropout 概率
         max_len (int): 最大序列长度，用于位置编码
     """

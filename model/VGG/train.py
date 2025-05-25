@@ -1,4 +1,4 @@
-from VGG import VGG
+from vgg import VGG
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import torch

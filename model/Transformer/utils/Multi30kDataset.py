@@ -46,7 +46,6 @@ class Multi30kDataset(Dataset):
         self.trg_eos_idx = self.trg_tokenizer.eos_token_id
         self.trg_pad_idx = self.trg_tokenizer.pad_token_id
 
-
     def _read_sentences(self, filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             return [line.strip() for line in f]
@@ -61,8 +60,8 @@ class Multi30kDataset(Dataset):
         # add_special_tokens=False: 我们手动添加EOS，避免tokenizer自动添加不需要的CLS/SEP
         src_numerical = self.src_tokenizer.encode(
             src_sentence,
-            add_special_tokens=False, # 不让HF tokenizer自动加 CLS 和 SEP
-            truncation=True, max_length=self.max_seq_len - 1 # 预留<eos>的地方
+            add_special_tokens=False,  # 不让HF tokenizer自动加 CLS 和 SEP
+            truncation=True, max_length=self.max_seq_len - 1  # 预留<eos>的地方
         )
         trg_numerical = self.trg_tokenizer.encode(
             trg_sentence,

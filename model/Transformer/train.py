@@ -24,7 +24,7 @@ from torch.optim import optimizer
 # 1. 配置参数
 # ==============================================================================
 # 数据路径
-data_dir = './Transformer/data/multi30k'
+data_dir = './model/Transformer/data/multi30k'
 src_lang = 'en' # Source language (e.g., English)
 trg_lang = 'de' # Target language (e.g., German)
 
@@ -97,6 +97,20 @@ train_loader = DataLoader(
     collate_fn=partial(collate_fn, src_pad_idx=en_pad_idx, trg_pad_idx=de_pad_idx)
 )
 
+val_loader = DataLoader(
+    val_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    collate_fn=partial(collate_fn, src_pad_idx=en_pad_idx, trg_pad_idx=de_pad_idx)
+)
+
+test_loader = DataLoader(
+    test_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    collate_fn=partial(collate_fn, src_pad_idx=en_pad_idx, trg_pad_idx=de_pad_idx)
+)
+
 for batch_idx, (src_batch, trg_batch) in enumerate(train_loader):
     print(f"Batch {batch_idx+1} Source Batch Shape: {src_batch.shape}")
     print(f"Batch {batch_idx+1} Target Batch Shape: {trg_batch.shape}")
@@ -109,13 +123,13 @@ for batch_idx, (src_batch, trg_batch) in enumerate(train_loader):
 # ==============================================================================
 # 3. 加载模型
 # ==============================================================================
-model = Transformer(len(tokenizer_en), len(tokenizer_de), d_model, n_head, d_ff, max_len=128).to(device)
+model = Transformer(len(tokenizer_en), len(tokenizer_de), d_model, n_head, d_ff, max_len=128, dropout=dropout).to(device)
 
 model.to(device)
 # ==============================================================================
 # 4. 训练循环
 # ==============================================================================
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 criterion = torch.nn.CrossEntropyLoss(ignore_index=de_pad_idx) # 忽略填充 token 的损失
 
 for epoch in range(num_epochs):
@@ -146,6 +160,7 @@ for epoch in range(num_epochs):
     print(f"Epoch {epoch + 1} completed. Average Training Loss: {avg_train_loss:.4f}")
 
 # 保存模型
-torch.save(model.state_dict(), 'Transformer/transformer_test_1.pth')
-print("模型已保存到 transformer_test_1.pth")
+save_path = "model/Transformer/transformer_test_3.pth"
+torch.save(model.state_dict(), save_path)
+print(f"模型已保存到 {save_path}")
 
