@@ -144,8 +144,8 @@ for epoch in range(num_epochs):
         target_labels = trg[:, 1:] # 真值target不要<sos>
         logits = model(src, decoder_input)
 
-        logits_flat = logits.contiguous().view(-1, len(tokenizer_de)) # []
-        target_labels_flat = target_labels.contiguous().view(-1)
+        logits_flat = logits.contiguous().view(-1, len(tokenizer_de)) # [batch_size * seq_len_trg, vocab_size]
+        target_labels_flat = target_labels.contiguous().view(-1) # [batch_size * seq_len_trg]
         loss = criterion(logits_flat, target_labels_flat)
 
         loss.backward()
