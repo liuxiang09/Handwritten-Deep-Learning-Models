@@ -1,40 +1,47 @@
 import requests
 from PIL import Image
-from transformers import CLIPProcessor, CLIPModel
+from transformers import CLIPProcessor, CLIPModel, CLIPConfig
 from datetime import datetime
 import torch
+from clip import CLIPContrastiveModel
 
 # 记录脚本开始时间
 print(f"{datetime.now()} - 脚本开始")
 
 # 准备图像和文本数据
-url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-image = Image.open(requests.get(url, stream=True).raw)
-
-texts = ["a photo of a cat", "a photo of a dog", "a photo of a person"] # 用于测试的文本列表
+image_url = ".\data\clip_images\image_0.jpg"
+# image = Image.open(requests.get(image_url, stream=True).raw)
+image = Image.open(image_url)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+texts = ["红色", "绿色", "粉红色", "天蓝色"] # 用于测试的文本列表
 
 # 加载 CLIP 模型和处理器
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+local_ckpt_path = "./model/CLIP/ckpt/clip_contrastive_model.pth" # 使用原始路径
+
+
+model = CLIPContrastiveModel('openai/clip-vit-base-patch32', 512)
+state_dict = torch.load(local_ckpt_path, map_location=device)
+model.load_state_dict(state_dict)
+print("成功加载本地模型！")
+
+
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
 # 记录模型加载完成时间
 print(f"{datetime.now()} - 模型和处理器加载完成")
 
 # 准备输入
-# 记录输入准备开始时间
-print(f"{datetime.now()} - 输入准备开始")
 inputs = processor(text=texts, images=image, return_tensors="pt", padding=True)
 
-# 记录输入准备完成时间
-print(f"{datetime.now()} - 输入准备完成")
 
 # 进行前向传播（推理）
 # 记录前向传播开始时间
 print(f"{datetime.now()} - 前向传播开始")
 outputs = model(**inputs)
-
+text_features, vision_features, logit_scale = outputs
 # 计算图像-文本相似度
-logits_per_image = outputs.logits_per_image # this is the image-text similarity score
+logits_per_image = logit_scale * vision_features @ text_features.T
+
 probs = logits_per_image.softmax(dim=1) # we can take softmax to get probabilities
 
 # 记录推理完成时间
