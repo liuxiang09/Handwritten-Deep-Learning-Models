@@ -17,35 +17,49 @@
 ## 📦 项目结构
 
 ```
-PyTorch_Training/
-├── models/
-│   ├── vgg/
-│   │   ├── vgg.py            # VGG模型定义
-│   │   └── train_vgg.py      # VGG训练脚本
-│   ├── transformer/
-│   │   ├── transformer.py    # Transformer模型定义 (你手写的源码)
-│   │   └── train_transformer.py # Transformer训练脚本
-│   └── ...                   # 未来添加更多模型，如ResNet, BERT等
-├── datasets/
-│   ├── translation/          # 翻译数据集 (例如，WMT, Multi30k)
-│   │   ├── raw/              # 原始数据
-│   │   └── processed/        # 预处理后的数据 (词汇表, tokenized files等)
-│   ├── image_classification/ # 图像分类数据集 (例如，CIFAR-10, ImageNetSubset)
-│   └── ...                   # 未来添加更多数据集
-├── utils/
-│   ├── data_preprocessing.py # 数据加载、分词、填充等通用工具
-│   ├── training_utils.py     # 训练循环、评估、学习率调度等工具
-│   ├── visualization.py      # 结果可视化工具
-│   └── ...
-├── huggingface_transformers/   # 专注于Hugging Face Transformers的学习与实践
-│   ├── quick_start.py        # Hugging Face入门示例
-│   ├── fine_tuning_bert.py   # BERT微调示例
-│   └── ...
-├── checkpoints/              # 训练好的模型权重保存目录
-├── notebooks/                # Jupyter Notebooks (用于实验、数据探索或教学)
+PyTorch/
+├── .gitignore
+├── model/
+│   ├── CLIP/
+│   │   ├── clip.py           # CLIP模型定义
+│   │   ├── dataset.py        # CLIP数据集处理
+│   │   ├── test_clip.py      # CLIP测试脚本
+│   │   └── train.py          # CLIP训练脚本
+│   ├── Transformer/
+│   │   ├── chat.py
+│   │   ├── config.py
+│   │   ├── decoder.py
+│   │   ├── encoder.py
+│   │   ├── eval.py
+│   │   ├── feedforward.py
+│   │   ├── multihead_attention.py
+│   │   ├── positional_encoding.py
+│   │   ├── test_shape.py
+│   │   ├── train.py
+│   │   ├── transformer.py    # Transformer模型定义
+│   │   └── utils/
+│   │       ├── Multi30kDataset.py # Multi30k数据集
+│   │       └── utils.py
+│   ├── VGG/
+│   │   ├── configs/
+│   │   │   ├── eval_config.yaml
+│   │   │   └── train_config.yaml
+│   │   ├── eval.py
+│   │   ├── train.py          # VGG训练脚本
+│   │   └── vgg.py            # VGG模型定义
+│   └── ViT/
+│       └── test.py           # ViT测试脚本
+├── Practice/                 # 练习和测试脚本
+│   ├── test_AutoTokenizer.py
+│   ├── test_dataset.py
+│   ├── test_GPU.py
+│   ├── test_package.py
+│   ├── test_tensorboard.py
+│   ├── test_torchvision_datasets.py
+│   ├── test_transforms.py
+│   └── train_Simple.py
 ├── README.md                 # 项目说明文件
-├── requirements.txt          # 项目依赖
-└── setup.py                  # (可选) 如果项目结构更复杂，可以用于打包
+└── requirements.txt          # 项目依赖
 ```
 
 ---
@@ -57,7 +71,7 @@ PyTorch_Training/
 * **实现状态:** ✅ 完成
 * **主要功能:** 图像分类
 * **数据集:** (待补充，例如：CIFAR-10)
-* **文件路径:** `models/vgg/vgg.py`, `models/vgg/train_vgg.py`
+* **文件路径:** `model/VGG/vgg.py`, `model/VGG/train.py`
 * **简要说明:** VGG 模型通过使用多层小卷积核（3x3），而非大卷积核，有效地增加了网络深度，同时保持了感受野，从而提高了模型的性能。
 * **训练结果:** (可选，添加训练曲线或准确率截图)
 
@@ -66,10 +80,28 @@ PyTorch_Training/
 * **实现状态:** ✅ 完成 (核心架构)
 * **主要功能:** 机器翻译
 * **数据集:** (待补充，例如：WMT English-German Subset)
-* **文件路径:** `models/transformer/transformer.py`, `models/transformer/train_transformer.py`
+* **文件路径:** `model/Transformer/transformer.py`, `model/Transformer/train.py`
 * **简要说明:** Transformer 模型完全基于自注意力（Self-Attention）机制，彻底摆脱了循环神经网络（RNN）和卷积神经网络（CNN）对序列数据的依赖，实现了并行化处理，极大地提升了处理长序列数据的效率。
 * **当前进度:** 已通过 `shape` 输出测试，正准备数据和训练。
 * **训练结果:** (待更新)
+
+### 3. CLIP (Contrastive Language-Image Pre-training)
+
+* **实现状态:** ⚙️ 进行中
+* **主要功能:** 跨模态图像-文本理解
+* **数据集:** (待补充，例如：COCO, Flickr30k)
+* **文件路径:** `model/CLIP/clip.py`, `model/CLIP/train.py`, etc.
+* **简要说明:** CLIP通过在大规模图像-文本对上进行对比学习，使得模型能够理解图像和文本之间的语义关系，从而实现零样本（zero-shot）图像分类、图像检索等任务。
+* **当前进度:** 正在进行模型定义、数据集处理和训练。
+
+### 4. ViT (Vision Transformer)
+
+* **实现状态:** ⚙️ 进行中
+* **主要功能:** 图像分类
+* **数据集:** (待补充，例如：ImageNet)
+* **文件路径:** `model/ViT/test.py`, etc.
+* **简要说明:** ViT 将 Transformer 架构首次成功应用于计算机视觉任务，将图像视为一系列序列化的图像块（patches），并直接应用于标准的 Transformer 编码器进行分类。
+* **当前进度:** 已有测试脚本，正在准备模型实现和训练。
 
 ---
 
@@ -127,13 +159,19 @@ PyTorch_Training/
 ### 训练 VGG 模型
 
 ```bash
-python models/vgg/train_vgg.py --epochs 10 --batch_size 64
+python model/VGG/train.py --epochs 10 --batch_size 64
 ```
 
 ### 训练 Transformer 模型 (数据准备完成后)
 
 ```bash
-python models/transformer/train_transformer.py --dataset_path datasets/translation/processed --epochs 20 --batch_size 32
+python model/Transformer/train.py --dataset_path datasets/translation/processed --epochs 20 --batch_size 32
+```
+
+### 训练 CLIP 模型 (数据准备完成后)
+
+```bash
+python model/CLIP/train.py --epochs 10 --batch_size 32
 ```
 
 ## 🤝 贡献
