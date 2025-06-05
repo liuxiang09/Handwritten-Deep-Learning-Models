@@ -1,5 +1,7 @@
-data
+data/*
 /logs
 __pycache__
 *.pth
 .idea
+checkpoints/*
+output

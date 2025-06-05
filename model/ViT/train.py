@@ -57,6 +57,13 @@ if __name__ == '__main__':
     transform = None
     cifar10_train = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
     cifar10_val = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+    
+    # 按照1/100的比率随机采样训练集和测试集
+    import random
+    train_indices = random.sample(range(len(cifar10_train)), len(cifar10_train) // 100)
+    cifar10_train = torch.utils.data.Subset(cifar10_train, train_indices)
+    eval_indices = random.sample(range(len(cifar10_val)), len(cifar10_val) // 100)
+    cifar10_val = torch.utils.data.Subset(cifar10_val, eval_indices)
     logging.info(f"Completed downloading the CIFAR10 dataset.")
 
     # Model initialization
@@ -81,16 +88,17 @@ if __name__ == '__main__':
 
     # 定义 TrainingArguments
     training_args = TrainingArguments(
-        output_dir="./vit_cifar10_results",  # 结果输出目录
+        output_dir="./model/ViT/output",     # 结果输出目录
         num_train_epochs=10,                 # 训练总轮数
         per_device_train_batch_size=32,      # 每个设备上的训练批次大小
         per_device_eval_batch_size=32,       # 每个设备上的评估批次大小
         learning_rate=5e-5,                  # 学习率
         weight_decay=0.01,                   # 权重衰减
-        logging_dir="./model/ViT/vit_cifar10_logs",    # 日志目录
+        logging_dir="./model/ViT/logs",      # 日志目录
         logging_steps=100,                   # 每多少步记录一次日志
-        eval_strategy="epoch",               # 在每个 epoch 结束时进行评估
-        save_strategy="epoch",               # 在每个 epoch 结束时保存检查点
+        eval_strategy="steps",               # 在每个 epoch 结束时进行评估
+        eval_steps = 5,                      # 每5个steps就进行一次评估
+        save_strategy="steps",               # 在每个 epoch 结束时保存检查点
         load_best_model_at_end=True,         # 训练结束时加载最佳模型
         metric_for_best_model="accuracy",    # 用于选择最佳模型的指标
         report_to="none",                    # 不向任何hub报告，或者可以设置为 "tensorboard"
@@ -108,7 +116,7 @@ if __name__ == '__main__':
     )
 
     logging.info("Starting training with Trainer...")
-    trainer.train()
+    trainer.train(resume_from_checkpoint=True)
     logging.info("Training complete. Evaluating model...")
 
     # 在训练结束后评估模型
@@ -116,7 +124,8 @@ if __name__ == '__main__':
     logging.info(f"Evaluation results: {eval_results}")
 
     # 可以选择保存微调后的模型
-    # trainer.save_model("./fine_tuned_vit_cifar10")
-    # logging.info("Fine-tuned model saved.")
+    trainer.save_model("./checkpoints/vit-cifar10")
+    processor.save_pretrained("./checkpoints/vit-cifar10")
+    logging.info("Fine-tuned model saved.")
 
 
