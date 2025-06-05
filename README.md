@@ -130,8 +130,9 @@ PyTorch/
 ## 🛠️ 环境配置
 
 1.  **克隆仓库:**
+
     ```bash
-    git clone [https://github.com/YourUsername/PyTorch_Training.git](https://github.com/YourUsername/PyTorch_Training.git)
+    git clone https://github.com/liuxiang09/Pytorch.git
     cd PyTorch_Training
     ```
 2.  **创建 Conda 环境 (推荐):**
@@ -141,15 +142,16 @@ PyTorch/
     conda activate pytorch_env
     ```
 3.  **安装依赖:**
+
     ```bash
     pip install -r requirements.txt
     ```
-    (请确保 `requirements.txt` 文件中包含了所有 PyTorch 和其他库的依赖，例如：`torch`, `torchvision`, `torchaudio`, `transformers`, `numpy`, `pandas`, `matplotlib`, `seaborn` 等。)
+
 4.  **安装 PyTorch (根据你的CUDA版本):**
     请访问 [PyTorch 官网](https://pytorch.org/get-started/locally/) 获取适合你系统和 CUDA 版本的安装命令。
     例如 (CUDA 11.8):
     ```bash
-    pip install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu118](https://download.pytorch.org/whl/cu118)
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
     ```
 
 ---
