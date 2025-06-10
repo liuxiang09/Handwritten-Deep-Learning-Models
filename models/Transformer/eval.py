@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer  # 导入 Hugging Face 分词器
-from transformer import Transformer
-from config import *
+from model.transformer import Transformer
+from configs.config import *
 from utils.Multi30kDataset import Multi30kDataset, collate_fn
 import os
 from torch.utils.data import DataLoader

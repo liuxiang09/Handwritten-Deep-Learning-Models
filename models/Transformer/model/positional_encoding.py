@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import math
-from config import *
 
 class TokenEmbedding(nn.Module):
     """

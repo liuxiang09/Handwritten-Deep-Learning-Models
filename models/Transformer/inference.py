@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer # 导入 Hugging Face 分词器
-from transformer import Transformer
-from config import *
+from model.transformer import Transformer
+from configs.config import *
 
 # ==============================================================================
 # 0. 准备工作：加载模型、分词器和必要的ID

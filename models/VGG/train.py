@@ -1,4 +1,4 @@
-from vgg import VGG
+from model.vgg import VGG
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import torch
@@ -10,7 +10,7 @@ def load_config(config_path):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
     
-config = load_config('model/VGG/configs/train_config.yaml')
+config = load_config('./models/VGG/configs/train_config.yaml')
 
 
 transforms = transforms.Compose([

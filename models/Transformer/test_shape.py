@@ -1,6 +1,6 @@
 import torch
-from config import *
-from transformer import Transformer
+from configs.config import *
+from model.transformer import Transformer
 
 
 

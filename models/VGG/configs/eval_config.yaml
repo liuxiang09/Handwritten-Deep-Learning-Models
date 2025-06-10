@@ -1,4 +1,4 @@
-# model/VGG/configs/eval_config.yaml
+# models/VGG/configs/eval_config.yaml
 # 评估配置
 evaluation:
   model_path: "model/VGG/vgg16_cifar10_epoch_10.pth"

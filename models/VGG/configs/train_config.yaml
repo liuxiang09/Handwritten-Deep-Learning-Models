@@ -1,4 +1,4 @@
-# model/VGG/configs/train_config.yaml
+# models/VGG/configs/train_config.yaml
 # 模型配置
 model:
   name: "VGG16"

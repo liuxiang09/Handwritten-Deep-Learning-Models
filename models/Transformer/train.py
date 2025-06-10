@@ -8,9 +8,9 @@ from tqdm import tqdm
 import os
 import math
 import time
-from transformer import Transformer 
+from model.transformer import Transformer 
 from functools import partial # 用于向 collate_fn 传递额外参数
-from config import *
+from configs.config import *
 from utils.Multi30kDataset import Multi30kDataset, collate_fn
 from torch.optim import optimizer
 # ==============================================================================
@@ -24,7 +24,7 @@ from torch.optim import optimizer
 # 1. 配置参数
 # ==============================================================================
 # 数据路径
-data_dir = './model/Transformer/data/multi30k'
+data_dir = './models/Transformer/data/multi30k'
 src_lang = 'en' # Source language (e.g., English)
 trg_lang = 'de' # Target language (e.g., German)
 

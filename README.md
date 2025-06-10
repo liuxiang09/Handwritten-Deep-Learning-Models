@@ -19,47 +19,40 @@
 ```
 PyTorch/
 ├── .gitignore
-├── model/
+├── models/
 │   ├── CLIP/
-│   │   ├── clip.py           # CLIP模型定义
-│   │   ├── dataset.py        # CLIP数据集处理
-│   │   ├── test_clip.py      # CLIP测试脚本
-│   │   └── train.py          # CLIP训练脚本
+│   │   ├── model/             # CLIP模型定义
+│   │   ├── utils/             # CLIP工具函数
+│   │   ├── checkpoints/       # 模型检查点保存目录
+│   │   ├── train.py           # 训练脚本
+│   │   └── inference.py       # 推理脚本
 │   ├── Transformer/
-│   │   ├── chat.py
-│   │   ├── config.py
-│   │   ├── decoder.py
-│   │   ├── encoder.py
-│   │   ├── eval.py
-│   │   ├── feedforward.py
-│   │   ├── multihead_attention.py
-│   │   ├── positional_encoding.py
-│   │   ├── test_shape.py
-│   │   ├── train.py
-│   │   ├── transformer.py    # Transformer模型定义
-│   │   └── utils/
-│   │       ├── Multi30kDataset.py # Multi30k数据集
-│   │       └── utils.py
+│   │   ├── configs/           # 配置文件目录
+│   │   ├── model/             # 模型实现目录
+│   │   ├── utils/             # 工具函数目录
+│   │   ├── eval.py            # 模型评估脚本
+│   │   ├── inference.py       # 模型推理脚本
+│   │   ├── test_shape.py      # 模型形状测试
+│   │   └── train.py           # 模型训练脚本
 │   ├── VGG/
-│   │   ├── configs/
-│   │   │   ├── eval_config.yaml
-│   │   │   └── train_config.yaml
-│   │   ├── eval.py
-│   │   ├── train.py          # VGG训练脚本
-│   │   └── vgg.py            # VGG模型定义
+│   │   ├── configs/           # 配置文件目录
+│   │   ├── model/             # 模型实现目录
+│   │   ├── checkpoints/       # 模型检查点保存目录
+│   │   ├── eval.py            # 评估脚本
+│   │   └── train.py           # 训练脚本
+│   ├── ViLT/
+│   │   └── inference.py       # 推理脚本
 │   └── ViT/
-│       └── test.py           # ViT测试脚本
-├── Practice/                 # 练习和测试脚本
+│       ├── train.py           # 训练脚本
+│       ├── eval.py            # 评估脚本
+│       └── inference.py       # 推理脚本
+├── Practice/                  # 练习和测试脚本
 │   ├── test_AutoTokenizer.py
 │   ├── test_dataset.py
 │   ├── test_GPU.py
-│   ├── test_package.py
-│   ├── test_tensorboard.py
-│   ├── test_torchvision_datasets.py
-│   ├── test_transforms.py
-│   └── train_Simple.py
-├── README.md                 # 项目说明文件
-└── requirements.txt          # 项目依赖
+│   └── ... (其他测试脚本)
+├── README.md                  # 项目说明文件
+└── requirements.txt           # 项目依赖
 ```
 
 ---
@@ -70,8 +63,7 @@ PyTorch/
 
 * **实现状态:** ✅ 完成
 * **主要功能:** 图像分类
-* **数据集:** (待补充，例如：CIFAR-10)
-* **文件路径:** `model/VGG/vgg.py`, `model/VGG/train.py`
+* **数据集:** CIFAR-10
 * **简要说明:** VGG 模型通过使用多层小卷积核（3x3），而非大卷积核，有效地增加了网络深度，同时保持了感受野，从而提高了模型的性能。
 * **训练结果:** (可选，添加训练曲线或准确率截图)
 
@@ -79,8 +71,7 @@ PyTorch/
 
 * **实现状态:** ✅ 完成 (核心架构)
 * **主要功能:** 机器翻译
-* **数据集:** (待补充，例如：WMT English-German Subset)
-* **文件路径:** `model/Transformer/transformer.py`, `model/Transformer/train.py`
+* **数据集:** Multi30k
 * **简要说明:** Transformer 模型完全基于自注意力（Self-Attention）机制，彻底摆脱了循环神经网络（RNN）和卷积神经网络（CNN）对序列数据的依赖，实现了并行化处理，极大地提升了处理长序列数据的效率。
 * **当前进度:** 已通过 `shape` 输出测试，正准备数据和训练。
 * **训练结果:** (待更新)
@@ -89,8 +80,7 @@ PyTorch/
 
 * **实现状态:** ⚙️ 进行中
 * **主要功能:** 跨模态图像-文本理解
-* **数据集:** (待补充，例如：COCO, Flickr30k)
-* **文件路径:** `model/CLIP/clip.py`, `model/CLIP/train.py`, etc.
+* **数据集:** COCO
 * **简要说明:** CLIP通过在大规模图像-文本对上进行对比学习，使得模型能够理解图像和文本之间的语义关系，从而实现零样本（zero-shot）图像分类、图像检索等任务。
 * **当前进度:** 正在进行模型定义、数据集处理和训练。
 
@@ -98,10 +88,17 @@ PyTorch/
 
 * **实现状态:** ⚙️ 进行中
 * **主要功能:** 图像分类
-* **数据集:** (待补充，例如：ImageNet)
-* **文件路径:** `model/ViT/test.py`, etc.
+* **数据集:** COCO
 * **简要说明:** ViT 将 Transformer 架构首次成功应用于计算机视觉任务，将图像视为一系列序列化的图像块（patches），并直接应用于标准的 Transformer 编码器进行分类。
-* **当前进度:** 已有测试脚本，正在准备模型实现和训练。
+* **当前进度:** 已有训练和评估脚本，正在完善模型实现。
+
+### 5. ViLT (Vision-and-Language Transformer)
+
+* **实现状态:** 🚧 初步规划
+* **主要功能:** 视觉-语言多模态任务
+* **数据集:** COCO
+* **简要说明:** ViLT 是一种视觉-语言 Transformer 模型，它通过联合处理图像和文本，实现图像-文本匹配、视觉问答等多模态任务。
+* **当前进度:** 已有推理脚本框架，正在设计模型架构。
 
 ---
 
@@ -138,7 +135,7 @@ PyTorch/
 2.  **创建 Conda 环境 (推荐):**
     
     ```bash
-    conda create -n pytorch_env python=3.9
+    conda create -n pytorch_env python=3.10
     conda activate pytorch_env
     ```
 3.  **安装依赖:**
@@ -158,22 +155,22 @@ PyTorch/
 
 ## 💡 使用指南 (示例)
 
-### 训练 VGG 模型
+### 模型训练
 
 ```bash
-python model/VGG/train.py --epochs 10 --batch_size 64
+python models/<模型名称>/train.py --epochs 20 --batch_size 32 --lr 0.001 --device cuda
 ```
 
-### 训练 Transformer 模型 (数据准备完成后)
+### 模型评估
 
 ```bash
-python model/Transformer/train.py --dataset_path datasets/translation/processed --epochs 20 --batch_size 32
+python models/<模型名称>/eval.py --checkpoint checkpoints/<模型名称>_model.pth --batch_size 64 --device cuda
 ```
 
-### 训练 CLIP 模型 (数据准备完成后)
+### 模型推理
 
 ```bash
-python model/CLIP/train.py --epochs 10 --batch_size 32
+python models/<模型名称>/inference.py --checkpoint checkpoints/<模型名称>_model.pth --input_data <输入数据路径> --output_dir <输出目录>
 ```
 
 ## 🤝 贡献

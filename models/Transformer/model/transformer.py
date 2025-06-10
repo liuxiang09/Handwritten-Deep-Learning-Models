@@ -1,10 +1,9 @@
 import torch
 import torch.nn as nn
-from config import *
-from encoder import Encoder
-from decoder import Decoder
+from model.encoder import Encoder
+from model.decoder import Decoder
 from utils.utils import *
-
+from configs.config import *
 
 class Transformer(nn.Module):
     """

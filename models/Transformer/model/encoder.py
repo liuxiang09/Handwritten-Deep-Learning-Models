@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
-import math
-from config import *
-from feedforward import FeedForward
-from multihead_attention import MultiHeadAttention
-from positional_encoding import TokenEmbedding, PositionalEncoding
+from model.feedforward import FeedForward
+from model.multihead_attention import MultiHeadAttention
+from model.positional_encoding import TokenEmbedding, PositionalEncoding
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model: int, n_head: int, d_ff: int, dropout: float):

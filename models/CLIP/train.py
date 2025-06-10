@@ -7,9 +7,8 @@ import os
 import random
 from tqdm import tqdm
 import argparse
-from clip import CLIPContrastiveModel
-from dataset import CustomCLIPDataset
-
+from model.clip import CLIPContrastiveModel, ContrastiveLoss
+from utils.dataset import CustomCLIPDataset
 
 
 
