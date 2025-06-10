@@ -3,7 +3,7 @@ from PIL import Image
 from transformers import CLIPProcessor, CLIPModel, CLIPConfig
 from datetime import datetime
 import torch
-from models.CLIP.model.clip import CLIPContrastiveModel
+from model.clip import CLIPContrastiveModel
 
 # 记录脚本开始时间
 print(f"{datetime.now()} - 脚本开始")

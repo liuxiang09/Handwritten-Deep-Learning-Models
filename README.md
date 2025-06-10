@@ -65,15 +65,15 @@ PyTorch/
 * **主要功能:** 图像分类
 * **数据集:** CIFAR-10
 * **简要说明:** VGG 模型通过使用多层小卷积核（3x3），而非大卷积核，有效地增加了网络深度，同时保持了感受野，从而提高了模型的性能。
-* **训练结果:** (可选，添加训练曲线或准确率截图)
+* **训练结果:** (待更新)
 
 ### 2. Transformer
 
-* **实现状态:** ✅ 完成 (核心架构)
+* **实现状态:** ✅ 完成
 * **主要功能:** 机器翻译
 * **数据集:** Multi30k
 * **简要说明:** Transformer 模型完全基于自注意力（Self-Attention）机制，彻底摆脱了循环神经网络（RNN）和卷积神经网络（CNN）对序列数据的依赖，实现了并行化处理，极大地提升了处理长序列数据的效率。
-* **当前进度:** 已通过 `shape` 输出测试，正准备数据和训练。
+* **当前进度:** 已完成模型训练和评估，评估结果待更新。
 * **训练结果:** (待更新)
 
 ### 3. CLIP (Contrastive Language-Image Pre-training)
@@ -104,23 +104,47 @@ PyTorch/
 
 ## 📚 学习计划 (未来)
 
-* **更多经典模型实现:**
-    * **CNNs:** ResNet, Inception, MobileNet
-    * **RNNs/LSTMs/GRUs:** 序列建模，文本生成
-    * **GANs:** 生成对抗网络
-    * **Diffusion Models:** 扩散模型基础
+* **多模态模型探索:**
+    * **BLIP/BLIP-2:** 图像-文本多模态理解与生成
+    * **LLaVA:** 大型语言-视觉助手模型
+    * **Flamingo:** 少样本视觉语言学习
+    * **ImageBind:** 多模态嵌入统一
+    * **CoCa:** 对比性跨模态预训练
+
+* **Grounding 相关任务:**
+    * **GLIP:** 基于短语的目标检测
+    * **Grounding DINO:** 开放词汇目标检测
+    * **Referring Expression Segmentation:** 指代表达分割
+    * **Visual Grounding:** 视觉定位任务
+    * **MDETR:** 端到端调制检测器
+
+* **检测与分割模型:**
+    * **DETR/Deformable DETR:** 端到端目标检测
+    * **Mask R-CNN/Mask2Former:** 实例分割
+    * **SAM (Segment Anything Model):** 通用分割模型
+    * **YOLO 系列 (v5-v8):** 实时目标检测
+    * **OneFormer:** 统一图像分割
+
+* **增量学习方法:**
+    * **知识蒸馏 (Knowledge Distillation):** 模型压缩与知识传递
+    * **持续学习 (Continual Learning):** 防止灾难性遗忘
+    * **少样本学习 (Few-shot Learning):** 从少量样本中学习
+    * **对比学习 (Contrastive Learning):** 自监督表示学习
+    * **元学习 (Meta-Learning):** 学会如何学习
+
 * **高级 PyTorch 特性:**
     * `torch.distributed` (分布式训练)
     * `torch.jit` (JIT 编译)
     * `torch.quantization` (模型量化)
-* **Hugging Face Transformers 深度学习:**
-    * **模型加载与使用:** 预训练模型加载、Tokenizers
-    * **任务微调:** 文本分类、命名实体识别、问答系统
-    * **自定义模型与训练:** 结合 PyTorch 和 Hugging Face 生态
+    * `torch.fx` (图形转换)
+    * `torch.compile` (编译优化)
+
 * **部署实践:**
-    * ONNX 导出
-    * TorchScript
-    * 部署到边缘设备或云平台
+    * ONNX 导出与优化
+    * TorchScript 序列化
+    * TensorRT 加速
+    * 移动端部署 (Android/iOS)
+    * 云端服务部署
 
 ---
 
