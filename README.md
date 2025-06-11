@@ -4,6 +4,31 @@
 
 ---
 
+## 📑 目录
+
+- [PyTorch训练](#pytorch训练)
+  - [📑 目录](#-目录)
+  - [🚀 项目目标](#-项目目标)
+  - [📦 项目结构](#-项目结构)
+  - [✨ 已实现模型](#-已实现模型)
+    - [1. VGG (Visual Geometry Group)](#1-vgg-visual-geometry-group)
+    - [2. Transformer](#2-transformer)
+    - [3. CLIP (Contrastive Language-Image Pre-training)](#3-clip-contrastive-language-image-pre-training)
+    - [4. ViT (Vision Transformer)](#4-vit-vision-transformer)
+    - [5. ViLT (Vision-and-Language Transformer)](#5-vilt-vision-and-language-transformer)
+    - [6. DETR (DEtection TRansformer)](#6-detr-detection-transformer)
+  - [📚 学习计划 (未来)](#-学习计划-未来)
+  - [🛠️ 环境配置](#️-环境配置)
+  - [💡 使用指南 (示例)](#-使用指南-示例)
+    - [模型训练](#模型训练)
+    - [模型评估](#模型评估)
+    - [模型推理](#模型推理)
+  - [🤝 贡献](#-贡献)
+  - [📄 许可证](#-许可证)
+  - [📞 联系我](#-联系我)
+
+
+
 ## 🚀 项目目标
 
 * **深入理解** PyTorch 框架的核心概念和API。
@@ -44,7 +69,7 @@ PyTorch/
 * **主要功能:** 图像分类
 * **数据集:** CIFAR-10
 * **简要说明:** VGG 模型通过使用多层小卷积核（3x3），而非大卷积核，有效地增加了网络深度，同时保持了感受野，从而提高了模型的性能。
-* **训练结果:** (待更新)
+* **当前进度:** 已完成模型训练和评估。
 
 ### 2. Transformer
 
@@ -52,8 +77,7 @@ PyTorch/
 * **主要功能:** 机器翻译
 * **数据集:** Multi30k
 * **简要说明:** Transformer 模型完全基于自注意力（Self-Attention）机制，彻底摆脱了循环神经网络（RNN）和卷积神经网络（CNN）对序列数据的依赖，实现了并行化处理，极大地提升了处理长序列数据的效率。
-* **当前进度:** 已完成模型训练和评估，评估结果待更新。
-* **训练结果:** (待更新)
+* **当前进度:** 已完成模型训练和评估。
 
 ### 3. CLIP (Contrastive Language-Image Pre-training)
 
@@ -61,7 +85,7 @@ PyTorch/
 * **主要功能:** 跨模态图像-文本理解
 * **数据集:** COCO
 * **简要说明:** CLIP通过在大规模图像-文本对上进行对比学习，使得模型能够理解图像和文本之间的语义关系，从而实现零样本（zero-shot）图像分类、图像检索等任务。
-* **当前进度:** 正在进行模型定义、数据集处理和训练。
+* **当前进度:** 正在进行数据集准备、处理以及模型训练。
 
 ### 4. ViT (Vision Transformer)
 
@@ -70,7 +94,7 @@ PyTorch/
 * **数据集:** CIFAR-10
 * **简要说明:** ViT 将 Transformer 架构首次成功应用于计算机视觉任务，将图像视为一系列序列化的图像块（patches），并直接应用于标准的 Transformer 编码器进行分类。
 * **实现方式:** 使用 Hugging Face Transformers 库完成训练和评估流程。
-* **当前进度:** 已完成模型训练和评估。
+* **当前进度:** 已使用transformers库完成模型训练和评估，暂未手写实现具体模块（可在CLIP中参考）。
 
 ### 5. ViLT (Vision-and-Language Transformer)
 
@@ -79,6 +103,19 @@ PyTorch/
 * **数据集:** COCO
 * **简要说明:** ViLT 是一种视觉-语言 Transformer 模型，它通过联合处理图像和文本，实现图像-文本匹配、视觉问答等多模态任务。
 * **当前进度:** 已有推理脚本框架，正在设计模型架构。
+
+### 6. DETR (DEtection TRansformer)
+
+* **实现状态:** 🚧 初步规划
+* **主要功能:** 端到端目标检测
+* **数据集:** COCO
+* **简要说明:** DETR 是一种基于 Transformer 的端到端目标检测模型，它摒弃了传统目标检测中的手工设计组件（如锚框、非极大值抑制等），直接将目标检测视为集合预测问题，通过双向匹配损失和并行解码实现高效检测。
+* **特点:**
+  * 端到端训练，无需后处理
+  * 基于 Transformer 编码器-解码器架构
+  * 使用匈牙利算法进行二分图匹配
+  * 全局建模能力强，可捕获目标间关系
+* **当前进度:** 正在设计模型架构和训练流程。
 
 ---
 

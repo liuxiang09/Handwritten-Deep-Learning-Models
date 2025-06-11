@@ -18,7 +18,7 @@ class CLIP(nn.Module):
         self.image_projection = nn.Linear(vision_feature_dim, embed_dim)
         self.text_projection = nn.Linear(text_feature_dim, embed_dim)
         
-        self.logit_scale = nn.Parameter(torch.ones([]) * 2.6592) # ln(1/0.07)
+        self.logit_scale = nn.Parameter(torch.tensor(2.6592)) # ln(1/0.07)
 
     def encode_image(self, image):
         return self.image_projection(self.image_encoder(image))

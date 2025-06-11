@@ -1,4 +1,5 @@
 data/*
+!data/DATASET.md
 /logs
 __pycache__
 *.pth
