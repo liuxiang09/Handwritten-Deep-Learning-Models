@@ -20,39 +20,18 @@
 PyTorch/
 ├── .gitignore
 ├── models/
-│   ├── CLIP/
-│   │   ├── model/             # CLIP模型定义
-│   │   ├── utils/             # CLIP工具函数
-│   │   ├── checkpoints/       # 模型检查点保存目录
-│   │   ├── train.py           # 训练脚本
-│   │   └── inference.py       # 推理脚本
-│   ├── Transformer/
-│   │   ├── configs/           # 配置文件目录
-│   │   ├── model/             # 模型实现目录
-│   │   ├── utils/             # 工具函数目录
-│   │   ├── eval.py            # 模型评估脚本
-│   │   ├── inference.py       # 模型推理脚本
-│   │   ├── test_shape.py      # 模型形状测试
-│   │   └── train.py           # 模型训练脚本
-│   ├── VGG/
-│   │   ├── configs/           # 配置文件目录
-│   │   ├── model/             # 模型实现目录
-│   │   ├── checkpoints/       # 模型检查点保存目录
-│   │   ├── eval.py            # 评估脚本
-│   │   └── train.py           # 训练脚本
-│   ├── ViLT/
-│   │   └── inference.py       # 推理脚本
-│   └── ViT/
-│       ├── train.py           # 训练脚本
-│       ├── eval.py            # 评估脚本
-│       └── inference.py       # 推理脚本
-├── Practice/                  # 练习和测试脚本
+│   ├── CLIP/...
+│   ├── Transformer/...
+│   ├── VGG/...
+│   ├── ViLT/...
+│   └── ViT/...
+├── TEST/
 │   ├── test_AutoTokenizer.py
 │   ├── test_dataset.py
 │   ├── test_GPU.py
-│   └── ... (其他测试脚本)
-├── README.md                  # 项目说明文件
-└── requirements.txt           # 项目依赖
+│   └── ...
+├── README.md
+└── requirements.txt
 ```
 
 ---
