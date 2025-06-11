@@ -25,7 +25,7 @@ class VisionEncoder(nn.Module):
         
         # CLS token
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) # [1, 1, D]
-
+        nn.init.normal_(self.cls_token, mean=0.0, std=0.01)
         # 位置编码
         num_patches = (image_size // patch_size) ** 2
         self.positional_embedding = nn.Parameter(torch.empty(1, num_patches + 1, embed_dim)) # [num_patches + 1, D]

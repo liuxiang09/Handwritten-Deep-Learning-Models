@@ -16,9 +16,11 @@ class AttentionPool2d(nn.Module):
         # x shape: (N, C, H, W)
         x = x.reshape(x.shape[0], x.shape[1], x.shape[2] * x.shape[3]).permute(2, 0, 1)  # (H*W, N, C)
         x = torch.cat([x.mean(dim=0, keepdim=True), x], dim=0)  # (H*W+1, N, C)
-        x = x + self.positional_embedding[:, None, :].to(x.dtype)  # Add pos embedding
+        # x = x + self.positional_embedding[:, None, :].to(x.dtype)  # Add pos embedding
+        x = x + self.positional_embedding.unsqueeze(1).to(x.dtype) # 这样写感觉更清晰
         
         # Multi-head attention
+        # 输出序列的长度与查询序列的长度相同
         x, _ = F.multi_head_attention_forward(
             query=x[:1], # 使用全局平均池化作为 query
             key=x,
@@ -39,7 +41,7 @@ class AttentionPool2d(nn.Module):
             use_separate_proj_weight=True,
             training=self.training,
             need_weights=False
-        )
+        ) # 输出形状: (1, N, C)
         return x.squeeze(0) # (N, C)
 
 # 需要导入 F

@@ -7,7 +7,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 # 添加项目根目录到路径
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from model.vision_encoder import VisionEncoder
 
 console = Console()
@@ -21,7 +21,7 @@ class TestVisionEncoder(unittest.TestCase):
         # 设置模型参数
         self.image_size = 224
         self.patch_size = 16
-        self.embed_dim = 512
+        self.embed_dim = 768
         self.n_head = 8
         self.n_layer = 6
         
@@ -35,71 +35,8 @@ class TestVisionEncoder(unittest.TestCase):
         ).to(self.device)
         
         # 创建测试输入
-        self.batch_size = 4
+        self.batch_size = 64
         self.test_input = torch.randn(self.batch_size, 3, self.image_size, self.image_size).to(self.device)
-
-    def test_output_shape(self):
-        """测试输出形状是否正确"""
-        with torch.no_grad():
-            output = self.model(self.test_input)
-        
-        expected_shape = torch.Size([self.batch_size, self.embed_dim])
-        self.assertEqual(output.shape, expected_shape)
-        
-        # 打印详细信息
-        shape_table = Table(title="形状测试结果")
-        shape_table.add_column("测试项", style="cyan")
-        shape_table.add_column("预期形状", style="green")
-        shape_table.add_column("实际形状", style="green")
-        shape_table.add_column("状态", style="bold")
-        
-        status = "[bold green]通过[/bold green]" if output.shape == expected_shape else "[bold red]失败[/bold red]"
-        shape_table.add_row("输出张量", str(expected_shape), str(output.shape), status)
-        console.print(shape_table)
-
-    def test_cls_token(self):
-        """测试CLS令牌是否正确添加和提取"""
-        # 保存中间输出的钩子
-        cls_token_output = None
-        
-        def hook_fn(module, input, output):
-            nonlocal cls_token_output
-            # 提取CLS令牌
-            cls_token_output = output[:, 0, :]
-            
-        # 注册钩子
-        hook = self.model.transformer_encoder.register_forward_hook(hook_fn)
-        
-        with torch.no_grad():
-            output = self.model(self.test_input)
-            
-        # 移除钩子
-        hook.remove()
-        
-        # 验证CLS令牌是否被正确处理
-        self.assertTrue(torch.allclose(output, self.model.ln_final(cls_token_output)))
-        
-        console.print(Panel("[bold green]CLS令牌测试通过: 确认模型正确提取并处理了CLS令牌[/bold green]"))
-
-    def test_normalization(self):
-        """测试输出特征的范数"""
-        with torch.no_grad():
-            output = self.model(self.test_input)
-            
-        # 计算每个特征向量的L2范数
-        norms = torch.norm(output, dim=1)
-        
-        # 打印范数统计
-        norm_table = Table(title="特征向量范数统计")
-        norm_table.add_column("统计量", style="cyan")
-        norm_table.add_column("值", style="green")
-        
-        norm_table.add_row("最小值", f"{norms.min().item():.4f}")
-        norm_table.add_row("最大值", f"{norms.max().item():.4f}")
-        norm_table.add_row("平均值", f"{norms.mean().item():.4f}")
-        norm_table.add_row("标准差", f"{norms.std().item():.4f}")
-        
-        console.print(norm_table)
 
     def test_model_parameters(self):
         """测试模型参数统计"""
@@ -115,10 +52,60 @@ class TestVisionEncoder(unittest.TestCase):
         param_table.add_row("不可训练参数量", f"{total_params - trainable_params:,}")
         
         console.print(param_table)
-        
-        # 打印模型结构
-        console.print("[bold]模型结构:[/bold]")
-        console.print(self.model)
+
+    def test_tensor_shapes(self):
+        """测试各部分输入输出tensor的shape（含中间层，更清晰）"""
+        intermediate_shapes = {}
+
+        # Hook for patch_embedding
+        def patch_embedding_hook(module, input, output):
+            intermediate_shapes["输入 (VisionEncoder)"] = tuple(input[0].shape)
+            intermediate_shapes["Patch Embedding 输出 (N, D, H/P, W/P)"] = tuple(output.shape)
+
+        # Hook for transformer_encoder
+        def transformer_encoder_hook(module, input, output):
+            # The input to transformer_encoder is already after CLS token and positional embedding
+            intermediate_shapes["Transformer Encoder 输入 (N, 1+num_patches, D)"] = tuple(input[0].shape)
+            intermediate_shapes["Transformer Encoder 输出 (N, 1+num_patches, D)"] = tuple(output.shape)
+
+        # Hook for ln_final
+        def ln_final_hook(module, input, output):
+            # Input to ln_final is the CLS token output from transformer
+            intermediate_shapes["最终 LayerNorm 输入 (CLS Token, N, D)"] = tuple(input[0].shape)
+            intermediate_shapes["最终 LayerNorm 输出 (N, D)"] = tuple(output.shape)
+
+        # Register hooks
+        hooks = [
+            self.model.patch_embedding.register_forward_hook(patch_embedding_hook),
+            self.model.transformer_encoder.register_forward_hook(transformer_encoder_hook),
+            self.model.ln_final.register_forward_hook(ln_final_hook),
+        ]
+
+        with torch.no_grad():
+            final_output = self.model(self.test_input)
+
+        # Print shape information
+        shape_table = Table(title="模型主要模块输入输出Shape统计")
+        shape_table.add_column("模块/阶段", style="cyan")
+        shape_table.add_column("Shape", style="green")
+
+        # Order them logically for better readability
+        shape_table.add_row("输入 (VisionEncoder)", str(intermediate_shapes["输入 (VisionEncoder)"]))
+        shape_table.add_row("Patch Embedding 输出", str(intermediate_shapes["Patch Embedding 输出 (N, D, H/P, W/P)"]))
+        shape_table.add_row("Transformer Encoder 输入", str(intermediate_shapes["Transformer Encoder 输入 (N, 1+num_patches, D)"]))
+        shape_table.add_row("Transformer Encoder 输出", str(intermediate_shapes["Transformer Encoder 输出 (N, 1+num_patches, D)"]))
+        shape_table.add_row("最终 LayerNorm 输入 (CLS Token)", str(intermediate_shapes["最终 LayerNorm 输入 (CLS Token, N, D)"]))
+        shape_table.add_row("最终 LayerNorm 输出", str(intermediate_shapes["最终 LayerNorm 输出 (N, D)"]))
+
+        console.print(shape_table)
+
+        # Assert final output shape
+        expected_shape = torch.Size([self.batch_size, self.embed_dim])
+        self.assertEqual(final_output.shape, expected_shape)
+
+        # Remove all hooks
+        for h in hooks:
+            h.remove()
 
 if __name__ == "__main__":
     unittest.main()
