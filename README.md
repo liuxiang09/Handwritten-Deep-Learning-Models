@@ -65,11 +65,12 @@ PyTorch/
 
 ### 4. ViT (Vision Transformer)
 
-* **实现状态:** ⚙️ 进行中
+* **实现状态:** ✅ 完成
 * **主要功能:** 图像分类
-* **数据集:** COCO
+* **数据集:** CIFAR-10
 * **简要说明:** ViT 将 Transformer 架构首次成功应用于计算机视觉任务，将图像视为一系列序列化的图像块（patches），并直接应用于标准的 Transformer 编码器进行分类。
-* **当前进度:** 已有训练和评估脚本，正在完善模型实现。
+* **实现方式:** 使用 Hugging Face Transformers 库完成训练和评估流程。
+* **当前进度:** 已完成模型训练和评估。
 
 ### 5. ViLT (Vision-and-Language Transformer)
 
