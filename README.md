@@ -86,7 +86,7 @@ PyTorch/
   - 实现了完整的 Transformer 编码器-解码器架构
   - 实现了多头自注意力机制和位置编码
   - 支持 Multi30k 数据集的训练和评估
-  - 实现了 Beam Search 解码策略
+  - 实现了贪婪解码策略
   - 提供了 BLEU 分数评估指标
   - 支持模型检查点的保存和恢复
 
@@ -190,7 +190,7 @@ PyTorch/
 
     ```bash
     git clone https://github.com/liuxiang09/Pytorch.git
-    cd PyTorch_Training
+    cd PyTorch
     ```
 2.  **创建 Conda 环境 (推荐):**
     
