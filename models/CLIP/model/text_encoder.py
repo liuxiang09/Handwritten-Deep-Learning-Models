@@ -36,27 +36,47 @@ class TextEncoder(nn.Module):
         self.ln_final = nn.LayerNorm(embed_dim)
         self.max_length = max_length
 
-    def forward(self, text: torch.Tensor) -> torch.Tensor:
+    def forward(self, text: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
         """
-        前向传播函数，接受一个输入张量 x，并返回文本编码器的输出。
+        前向传播函数，接受一个输入张量和注意力掩码，并返回文本编码器的输出。
         
+        Args:
+            text (torch.Tensor): 输入文本的token ids，形状为 [N, L]
+            attention_mask (torch.Tensor, optional): 注意力掩码，形状为 [N, L]，
+                                                   1表示需要注意的token，0表示padding token
+        
+        Returns:
+            torch.Tensor: 文本特征向量，形状为 [N, D]
         """
         # text: [N, L]
         # 检查序列长度
         if text.size(1) > self.max_length:
             text = text[:, :self.max_length]
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, :self.max_length]
         
         # 词嵌入
         x = self.token_embedding(text) # [N, L, D]
         x = x + self.positional_embedding[:text.size(1)] # [N, L, D] + [L, D] -> [N, L, D] 广播机制
 
-        # 编码器
-        x = self.transformer_encoder(x) # [N, L, D]
+        
+        # 如果提供了attention_mask，需要将其转换为PyTorch transformer期望的格式
+        if attention_mask is not None:
+            attention_mask = attention_mask.bool()
+            attention_mask = ~attention_mask  # 反转掩码，False表示参与计算
 
-        # 取 [EOS] token 的输出作为文本特征, [EOS] token 是每个序列的最后一个有效 token。
-        # eot_token_pos shape: (N,)
-        eot_token_pos = text.argmax(dim=-1) # 找到每行中ID最大的值的位置，一般来说词汇表中[EOS] token 的ID最大
+        # 编码器（带掩码）
+        x = self.transformer_encoder(x, src_key_padding_mask=attention_mask) # [N, L, D]
+
+        # 取 [EOS] token 的输出作为文本特征
+        # 注意：attention_mask已经被反转，False表示有效token
+        if attention_mask is not None:
+            # (~attention_mask)中1表示有效token，找到最后一个1的位置
+            eot_token_pos = (~attention_mask).sum(dim=1) - 1  # [N]
+        else:
+            # 如果没有掩码，就找最后一个位置
+            eot_token_pos = torch.full((text.shape[0],), text.shape[1]-1, device=text.device)  # [N]
+            
         x = x[torch.arange(x.shape[0]), eot_token_pos] # [N, D]
-
         x = self.ln_final(x) # [N, D]
         return x

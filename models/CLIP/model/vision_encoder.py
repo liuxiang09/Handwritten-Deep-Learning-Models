@@ -10,7 +10,6 @@ class VisionEncoder(nn.Module):
             embed_dim: int,
             n_head: int,
             n_layer: int,
-            dropout: float = 0.1,
     ):
         super().__init__()
 

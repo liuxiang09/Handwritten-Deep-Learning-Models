@@ -19,26 +19,81 @@ from model.text_encoder import TextEncoder
 from model.modified_resnet import ModifiedResNet
 
 # 对比损失函数
+# 由于一个图片有5个文本，所以无法采用常规的交叉熵损失函数
+# class ContrastiveLoss(nn.Module):
+#     def __init__(self):
+#         super().__init__()
+
+#     def forward(self, image_features, text_features, logit_scale):
+#         # 归一化特征 (已经在 CLIP 模型的 forward 中完成)
+        
+#         # 计算相似度矩阵
+#         logits = (image_features @ text_features.T) * logit_scale.exp()
+
+#         # 创建标签 (对角线为正样本)
+#         labels = torch.arange(len(logits)).to(logits.device)
+
+#         # 计算图像到文本的损失 (行是图像，列是文本)
+#         loss_i = F.cross_entropy(logits, labels)
+        
+#         # 计算文本到图像的损失 (转置 logits，行是文本，列是图像)
+#         loss_t = F.cross_entropy(logits.T, labels)
+        
+#         # 返回平均损失
+#         return (loss_i + loss_t) / 2
+
 class ContrastiveLoss(nn.Module):
+    """
+    能够正确处理一个图像对应多个文本描述的对比损失函数。
+    """
     def __init__(self):
         super().__init__()
 
     def forward(self, image_features, text_features, logit_scale):
-        # 归一化特征 (已经在 CLIP 模型的 forward 中完成)
-        
+        """
+        Args:
+            image_features: shape [N, D], N 是批次中的图片数量。
+            text_features: shape [5*N, D], 对应 N 张图片的 5*N 个文本描述。
+            logit_scale: 可学习的温度参数。
+        """
+        device = image_features.device
+        num_images = image_features.shape[0]
+        num_texts = text_features.shape[0]
+
+        # 验证输入形状是否匹配
+        if num_texts % num_images != 0 or num_texts // num_images != 5:
+            raise ValueError("文本特征数量必须是图片特征数量的5倍。")
+
         # 计算相似度矩阵
-        logits = (image_features @ text_features.T) * logit_scale.exp()
+        # logits_per_image shape: [N, 5*N]
+        logits_per_image = (logit_scale.exp() * image_features @ text_features.T)
+        # logits_per_text shape: [5*N, N]
+        logits_per_text = logits_per_image.T
 
-        # 创建标签 (对角线为正样本)
-        labels = torch.arange(len(logits)).to(logits.device)
+        # --- 正确的损失计算 ---
 
-        # 计算图像到文本的损失 (行是图像，列是文本)
-        loss_i = F.cross_entropy(logits, labels)
+        # 1. 计算 loss_t (文找图): 这是一个标准的多类别分类问题
+        # 每个文本都有一个正确的图片目标。
+        # 创建标签 [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, ..., N-1, ...]
+        text_labels = torch.arange(num_images, device=device).repeat_interleave(5)
+        loss_t = F.cross_entropy(logits_per_text, text_labels)
+
+        # 2. 计算 loss_i (图找文): 这是一个多标签分类问题
+        # 每张图片有5个正确的文本目标。标准的 cross_entropy 不适用。
+        # 我们需要创建一个 "多热" (multi-hot) 的标签矩阵。
+        # ground_truth shape: [N, 5*N]
+        ground_truth = torch.zeros(logits_per_image.shape, dtype=torch.float, device=device)
+        for i in range(num_images):
+            # 将图片i对应的5个文本位置标记为1
+            start_idx = i * 5
+            end_idx = start_idx + 5
+            ground_truth[i, start_idx:end_idx] = 1.0
         
-        # 计算文本到图像的损失 (转置 logits，行是文本，列是图像)
-        loss_t = F.cross_entropy(logits.T, labels)
-        
-        # 返回平均损失
+        # 使用二元交叉熵损失 (Binary Cross Entropy)
+        # 它将每个输出logit视为一个独立的二元分类（是/不是 正确的匹配）
+        loss_i = F.binary_cross_entropy_with_logits(logits_per_image, ground_truth)
+
+        # 返回两个方向损失的平均值
         return (loss_i + loss_t) / 2
 
 
@@ -63,10 +118,11 @@ def train(args, model, dataloader, device):
         for idx, batch in enumerate(pbar):
             input_ids = batch['input_ids'].to(device)
             pixel_values = batch['pixel_values'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
 
             optimizer.zero_grad()
 
-            image_features, text_features = model(pixel_values, input_ids)
+            image_features, text_features = model(pixel_values, input_ids, attention_mask)
             logit_scale = model.logit_scale
 
             loss = criterion(image_features, text_features, logit_scale)
@@ -92,56 +148,96 @@ def train(args, model, dataloader, device):
 
     return model
 
-def evaluate(args, model, dataloader, criterion, device):
+def evaluate(model, dataloader, device):
     """
-    评估 CLIP 模型的性能
+    更标准、更全面地评估 CLIP 模型在“一对多”检索任务上的性能。
+    分别计算 Image-to-Text 和 Text-to-Image 的 Recall@1 和 Recall@5。
     """
     model.eval()
-    total_loss = 0
+    
+    # 初始化各种指标的计数器
     total_samples = 0
-    correct_image_text = 0
-    correct_text_image = 0
+    i2t_r1_correct = 0
+    i2t_r5_correct = 0
+    t2i_r1_correct = 0
+    t2i_r5_correct = 0
 
-    print("Starting evaluation...")
+    print("🚀 Starting comprehensive evaluation for retrieval...")
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Evaluating"):
-            input_ids = batch['input_ids'].to(device)
+            # pixel_values: [N, C, H, W]
+            # input_ids: [5*N, max_len]
             pixel_values = batch['pixel_values'].to(device)
-            batch_size = input_ids.size(0)
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            num_images = pixel_values.shape[0]
+            num_texts = input_ids.shape[0]
 
-            # 获取特征
-            image_features, text_features = model(pixel_values, input_ids)
-            logit_scale = model.logit_scale
+            # 1. 获取特征
+            image_features, text_features = model(pixel_values, input_ids, attention_mask)
+            logit_scale = model.logit_scale.exp()
 
-            # 计算相似度矩阵
-            logits = (image_features @ text_features.T) * logit_scale.exp()
+            # 2. 计算相似度矩阵
+            # logits_per_image (I2T): [N, 5*N]
+            logits_per_image = image_features @ text_features.T * logit_scale
+            # logits_per_text (T2I): [5*N, N]
+            logits_per_text = logits_per_image.T
             
-            # 计算损失
-            labels = torch.arange(len(logits)).to(logits.device)
-            loss_i = F.cross_entropy(logits, labels)
-            loss_t = F.cross_entropy(logits.T, labels)
-            loss = (loss_i + loss_t) / 2
+            # --- 3. Image-to-Text (I2T) Recall 计算 ---
+            # 对于第 i 张图片，正确的文本索引是 [i*5, i*5+1, ..., i*5+4]
             
-            # 计算准确率
-            image_pred = logits.argmax(dim=1)
-            text_pred = logits.T.argmax(dim=1)
-            correct_image_text += (image_pred == labels).sum().item()
-            correct_text_image += (text_pred == labels).sum().item()
-            
-            total_loss += loss.item() * batch_size
-            total_samples += batch_size
+            # I2T Recall@1
+            # 找到每张图片最匹配的文本索引
+            i2t_preds_r1 = logits_per_image.argmax(dim=1)
+            # 检查预测是否在正确范围内
+            for i in range(num_images):
+                if (i * 5) <= i2t_preds_r1[i] < ((i + 1) * 5):
+                    i2t_r1_correct += 1
 
-    avg_loss = total_loss / total_samples
-    image_text_accuracy = 100 * correct_image_text / total_samples
-    text_image_accuracy = 100 * correct_text_image / total_samples
+            # I2T Recall@5
+            # 找到每张图片最匹配的前5个文本索引
+            _, i2t_preds_r5_indices = logits_per_image.topk(5, dim=1)
+            # 检查这top-5的预测中，是否有任何一个落在正确的5个答案里
+            for i in range(num_images):
+                pred_indices = set(i2t_preds_r5_indices[i].tolist())
+                true_indices = set(range(i * 5, (i + 1) * 5))
+                if len(pred_indices & true_indices) > 0:
+                    i2t_r5_correct += 1
+
+            # --- 4. Text-to-Image (T2I) Recall 计算 ---
+            # 对于第 j 个文本，正确的图片索引是 floor(j / 5)
+            ground_truth = torch.arange(num_texts, device=device) // 5 # [0,0,0,0,0,1,1,1,1,1,2,2,2,2,2,...]
+
+            # T2I Recall@1
+            t2i_preds_r1 = logits_per_text.argmax(dim=1)
+            t2i_r1_correct += (t2i_preds_r1 == ground_truth).sum().item()
+
+            # T2I Recall@5
+            _, t2i_preds_r5_indices = logits_per_text.topk(5, dim=1) # [N*5, 5]
+            # 检查正确答案是否出现在 top-5 预测中
+            t2i_r5_correct += (t2i_preds_r5_indices == ground_truth.unsqueeze(1)).any(dim=1).sum().item()
+            
+            total_samples += num_images
+
+    # --- 5. 计算并打印最终结果 ---
+    i2t_r1 = 100 * i2t_r1_correct / total_samples
+    i2t_r5 = 100 * i2t_r5_correct / total_samples
+    # 对于T2I，样本总数是 5 * total_samples
+    t2i_r1 = 100 * t2i_r1_correct / (total_samples * 5)
+    t2i_r5 = 100 * t2i_r5_correct / (total_samples * 5)
+
+    print("\n✅ Evaluation Results:")
+    print(f"  Image-to-Text Recall@1: {i2t_r1:.2f}%")
+    print(f"  Image-to-Text Recall@5: {i2t_r5:.2f}%")
+    print("-" * 30)
+    print(f"  Text-to-Image Recall@1: {t2i_r1:.2f}%")
+    print(f"  Text-to-Image Recall@5: {t2i_r5:.2f}%")
     
-    print(f"Evaluation Results:")
-    print(f"Average Loss: {avg_loss:.4f}")
-    print(f"Image->Text Accuracy: {image_text_accuracy:.2f}%")
-    print(f"Text->Image Accuracy: {text_image_accuracy:.2f}%")
-    print(f"Average Accuracy: {(image_text_accuracy + text_image_accuracy) / 2:.2f}%")
-
-    return avg_loss
+    # 通常会报告所有这些指标，而不是一个单一的“准确率”
+    return {
+        "i2t_r1": i2t_r1, "i2t_r5": i2t_r5,
+        "t2i_r1": t2i_r1, "t2i_r5": t2i_r5
+    }
 
 # 6. 主函数
 if __name__ == "__main__":
@@ -153,7 +249,7 @@ if __name__ == "__main__":
     # parser.add_argument("--save_model_path", type=str, default="./models/CLIP/checkpoints/my_clip_resnet_epoch_1.pth")
 
     # 训练相关参数
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--num_epochs", type=int, default=1)
     parser.add_argument("--learning_rate", type=float, default=2e-5)
     parser.add_argument("--num_workers", type=int, default=4)
@@ -196,7 +292,11 @@ if __name__ == "__main__":
         processor=processor,
         max_len=args.max_seq_length
     )
-
+    print(dataset[0])
+    print(dataset[0]['attention_mask'].shape)
+    print(dataset[0]['input_ids'].shape)
+    print(dataset[0]['pixel_values'].shape)
+    
     # 创建训练集和评估集
     total_size = len(dataset)
     train_size = total_size // 5  # 训练集取1/5
@@ -224,6 +324,13 @@ if __name__ == "__main__":
         pin_memory=True,
         collate_fn=collate_fn
     )
+
+    for i, batch in enumerate(train_dataloader):
+        if i == 0:  
+            print(batch['input_ids'].shape)
+            print(batch['attention_mask'].shape)
+            print(batch['pixel_values'].shape)
+            # input("Press Enter to continue...")
 
     eval_dataloader = DataLoader(
         eval_dataset,
@@ -253,7 +360,7 @@ if __name__ == "__main__":
         embed_dim=args.text_feature_dim,
         max_length=args.max_seq_length,
         n_head=args.text_n_head,
-        n_layer=args.text_n_layer
+        n_layer=args.text_n_layer,
     ).to(device)
 
     # 根据选择的图像编码器类型设置特征维度
@@ -271,7 +378,7 @@ if __name__ == "__main__":
         text_encoder=text_encoder,
         vision_feature_dim=vision_feature_dim,
         text_feature_dim=args.text_feature_dim,
-        embed_dim=args.projection_dim
+        embed_dim=args.projection_dim,
     ).to(device)
 
     # 如果是评估模式，加载预训练模型
@@ -282,6 +389,5 @@ if __name__ == "__main__":
     if args.eval:
         print(f"Loading model from {save_model_path}")
         model.load_state_dict(torch.load(save_model_path))
-        criterion = ContrastiveLoss()
-        evaluate(args, model, eval_dataloader, criterion, device)
+        evaluate(model, eval_dataloader, device)
     
