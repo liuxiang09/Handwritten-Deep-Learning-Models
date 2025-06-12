@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from transformers import CLIPProcessor
-from PIL import Image
 import os
 import random
 from tqdm import tqdm
@@ -13,10 +12,11 @@ from utils.flickr30k import Flickr30kDataset, collate_fn
 
 # 导入你的自定义模型
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from model.clip import CLIP
+from eval import evaluate
 from model.vision_encoder import VisionEncoder, VisionEncoderPretrained
 from model.text_encoder import TextEncoder
 from model.modified_resnet import ModifiedResNet
+from model.clip import CLIP
 
 # 对比损失函数
 # 由于一个图片有5个文本，所以无法采用常规的交叉熵损失函数
@@ -148,96 +148,6 @@ def train(args, model, dataloader, device):
 
     return model
 
-def evaluate(model, dataloader, device):
-    """
-    更标准、更全面地评估 CLIP 模型在“一对多”检索任务上的性能。
-    分别计算 Image-to-Text 和 Text-to-Image 的 Recall@1 和 Recall@5。
-    """
-    model.eval()
-    
-    # 初始化各种指标的计数器
-    total_samples = 0
-    i2t_r1_correct = 0
-    i2t_r5_correct = 0
-    t2i_r1_correct = 0
-    t2i_r5_correct = 0
-
-    print("🚀 Starting comprehensive evaluation for retrieval...")
-    with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Evaluating"):
-            # pixel_values: [N, C, H, W]
-            # input_ids: [5*N, max_len]
-            pixel_values = batch['pixel_values'].to(device)
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            num_images = pixel_values.shape[0]
-            num_texts = input_ids.shape[0]
-
-            # 1. 获取特征
-            image_features, text_features = model(pixel_values, input_ids, attention_mask)
-            logit_scale = model.logit_scale.exp()
-
-            # 2. 计算相似度矩阵
-            # logits_per_image (I2T): [N, 5*N]
-            logits_per_image = image_features @ text_features.T * logit_scale
-            # logits_per_text (T2I): [5*N, N]
-            logits_per_text = logits_per_image.T
-            
-            # --- 3. Image-to-Text (I2T) Recall 计算 ---
-            # 对于第 i 张图片，正确的文本索引是 [i*5, i*5+1, ..., i*5+4]
-            
-            # I2T Recall@1
-            # 找到每张图片最匹配的文本索引
-            i2t_preds_r1 = logits_per_image.argmax(dim=1)
-            # 检查预测是否在正确范围内
-            for i in range(num_images):
-                if (i * 5) <= i2t_preds_r1[i] < ((i + 1) * 5):
-                    i2t_r1_correct += 1
-
-            # I2T Recall@5
-            # 找到每张图片最匹配的前5个文本索引
-            _, i2t_preds_r5_indices = logits_per_image.topk(5, dim=1)
-            # 检查这top-5的预测中，是否有任何一个落在正确的5个答案里
-            for i in range(num_images):
-                pred_indices = set(i2t_preds_r5_indices[i].tolist())
-                true_indices = set(range(i * 5, (i + 1) * 5))
-                if len(pred_indices & true_indices) > 0:
-                    i2t_r5_correct += 1
-
-            # --- 4. Text-to-Image (T2I) Recall 计算 ---
-            # 对于第 j 个文本，正确的图片索引是 floor(j / 5)
-            ground_truth = torch.arange(num_texts, device=device) // 5 # [0,0,0,0,0,1,1,1,1,1,2,2,2,2,2,...]
-
-            # T2I Recall@1
-            t2i_preds_r1 = logits_per_text.argmax(dim=1)
-            t2i_r1_correct += (t2i_preds_r1 == ground_truth).sum().item()
-
-            # T2I Recall@5
-            _, t2i_preds_r5_indices = logits_per_text.topk(5, dim=1) # [N*5, 5]
-            # 检查正确答案是否出现在 top-5 预测中
-            t2i_r5_correct += (t2i_preds_r5_indices == ground_truth.unsqueeze(1)).any(dim=1).sum().item()
-            
-            total_samples += num_images
-
-    # --- 5. 计算并打印最终结果 ---
-    i2t_r1 = 100 * i2t_r1_correct / total_samples
-    i2t_r5 = 100 * i2t_r5_correct / total_samples
-    # 对于T2I，样本总数是 5 * total_samples
-    t2i_r1 = 100 * t2i_r1_correct / (total_samples * 5)
-    t2i_r5 = 100 * t2i_r5_correct / (total_samples * 5)
-
-    print("\n✅ Evaluation Results:")
-    print(f"  Image-to-Text Recall@1: {i2t_r1:.2f}%")
-    print(f"  Image-to-Text Recall@5: {i2t_r5:.2f}%")
-    print("-" * 30)
-    print(f"  Text-to-Image Recall@1: {t2i_r1:.2f}%")
-    print(f"  Text-to-Image Recall@5: {t2i_r5:.2f}%")
-    
-    # 通常会报告所有这些指标，而不是一个单一的“准确率”
-    return {
-        "i2t_r1": i2t_r1, "i2t_r5": i2t_r5,
-        "t2i_r1": t2i_r1, "t2i_r5": t2i_r5
-    }
 
 # 6. 主函数
 if __name__ == "__main__":
@@ -246,7 +156,7 @@ if __name__ == "__main__":
     # 路径相关参数
     parser.add_argument("--image_dir", type=str, default="./data/flickr30k_images/flickr30k_images")
     parser.add_argument("--text_data_path", type=str, default="./data/flickr30k_images/results.csv")
-    # parser.add_argument("--save_model_path", type=str, default="./models/CLIP/checkpoints/my_clip_resnet_epoch_1.pth")
+    parser.add_argument("--log_dir", type=str, default="./models/CLIP/logs")
 
     # 训练相关参数
     parser.add_argument("--batch_size", type=int, default=16)
@@ -255,14 +165,16 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--log_steps", type=int, default=10)
     parser.add_argument("--eval", action="store_true", help="Run evaluation only")
-    parser.add_argument("--train", action="store_true", help="Run training only") 
+    parser.add_argument("--train", action="store_true", help="Run training only")
+    parser.add_argument("--train_sample_rate", type=float, default=0.7, help="train data sample rate")
+    parser.add_argument("--eval_sample_rate", type=float, default=0.3, help="eval data sample rate")
 
     # 模型相关参数
     parser.add_argument("--model_name", type=str, default="openai/clip-vit-base-patch32")
     parser.add_argument("--pretrained_model_name", type=str, default="vit_base_patch16_clip_224.openai")
     parser.add_argument("--projection_dim", type=int, default=512)
     parser.add_argument("--max_seq_length", type=int, default=77)
-    parser.add_argument("--image_encoder_type", type=str, default="vit-pretrained")
+    parser.add_argument("--image_encoder_type", type=str, default="resnet")
     # parser.add_argument("--temperature", type=float, default=0.07, help="Temperature parameter for contrastive loss") # logit_scale 已经包含
 
     # 视觉编码器参数
@@ -300,14 +212,19 @@ if __name__ == "__main__":
     
     # 创建训练集和评估集
     total_size = len(dataset)
-    train_size = total_size // 5  # 训练集取1/5
-    eval_size = total_size // 10  # 评估集取1/10
+    train_size = int(total_size * args.train_sample_rate)
+    eval_size = int(total_size * args.eval_sample_rate)
     
-    # 随机采样不重叠的索引
-    all_indices = list(range(total_size))
-    train_indices = random.sample(all_indices, train_size)
-    remaining_indices = list(set(all_indices) - set(train_indices))
-    eval_indices = random.sample(remaining_indices, eval_size)
+    try:
+        # 随机采样不重叠的索引
+        all_indices = list(range(total_size))
+        train_indices = random.sample(all_indices, train_size)
+        remaining_indices = list(set(all_indices) - set(train_indices))
+        eval_indices = random.sample(remaining_indices, eval_size)
+    except ValueError as e:
+        print(f"请求的样本数量大于数据集总数量，请调整采样率")
+        print(f"ValueError: {e}")
+        exit()
     
     # 创建训练集和评估集
     train_dataset = torch.utils.data.Subset(dataset, train_indices)
