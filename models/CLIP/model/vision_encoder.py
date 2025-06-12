@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-
+# 无预训练权重的VisionEncoder
 class VisionEncoder(nn.Module):
     def __init__(
             self,
@@ -51,7 +51,7 @@ class VisionEncoder(nn.Module):
             image (torch.Tensor): 输入图片, shape: (N, 3, H, W)
 
         Returns:
-            torch.Tensor: 图像特征, shape: (N, embed_dim)
+            torch.Tensor: 图像特征, shape: (N, D)
         """
         x = self.patch_embedding(image) # [N, D, H/P, W/P]
         x = x.flatten(2) # [N, D, H/P * W/P]
@@ -72,3 +72,48 @@ class VisionEncoder(nn.Module):
 
         x = self.ln_final(x) # [N, D]
         return x
+    
+# 有预训练权重的VisionEncoder
+import timm
+class VisionEncoderPretrained(nn.Module):
+    def __init__(
+            self,
+            pretrained_model_name: str,
+            pretrained: bool = True,
+            embed_dim: int = 768, # Base ViT 的 embed_dim 是 768
+    ):
+        """
+        使用 timm 加载预训练的 Vision Transformer 模型。
+
+        Args:
+            pretrained_model_name (str): timm 库中的模型名称。
+            pretrained (bool): 是否加载预训练权重。
+            embed_dim (int): 模型的输出维度。
+        """
+        super().__init__()
+        self.embed_dim = embed_dim
+        # timm 的 ViT 模型内部已经包含了 CLS token、位置编码和最后的 LayerNorm
+        # 所以我们不再需要手动定义 self.cls_token, self.positional_embedding 和 self.ln_final
+        # 它们的结构已经和预训练权重完美匹配
+        self.vit = timm.create_model(
+            model_name=pretrained_model_name,
+            pretrained=pretrained,
+            num_classes=0,
+        )
+        
+    def forward(self, image: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            image (torch.Tensor): 输入图片, shape: (N, 3, H, W)
+                                  注意：H 和 W 需要与模型匹配，例如 224x224
+
+        Returns:
+            torch.Tensor: 图像特征, shape: (N, embed_dim)
+        """
+        # timm 的 ViT 模型直接返回cls token的特征
+        cls_token_features = self.vit(image) # [N, D]
+        # 仅在第一次前向传播时打印shape
+        # if not hasattr(self, '_shape_printed'):
+        #     print("cls_token_features.shape:", cls_token_features.shape)
+        #     self._shape_printed = True
+        return cls_token_features

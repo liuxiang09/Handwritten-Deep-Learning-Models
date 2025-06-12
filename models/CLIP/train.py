@@ -14,7 +14,7 @@ from utils.flickr30k import Flickr30kDataset, collate_fn
 # 导入你的自定义模型
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from model.clip import CLIP
-from model.vision_encoder import VisionEncoder
+from model.vision_encoder import VisionEncoder, VisionEncoderPretrained
 from model.text_encoder import TextEncoder
 from model.modified_resnet import ModifiedResNet
 
@@ -259,9 +259,10 @@ if __name__ == "__main__":
 
     # 模型相关参数
     parser.add_argument("--model_name", type=str, default="openai/clip-vit-base-patch32")
+    parser.add_argument("--pretrained_model_name", type=str, default="vit_base_patch16_clip_224.openai")
     parser.add_argument("--projection_dim", type=int, default=512)
     parser.add_argument("--max_seq_length", type=int, default=77)
-    parser.add_argument("--image_encoder_type", type=str, default="vit")
+    parser.add_argument("--image_encoder_type", type=str, default="vit-pretrained")
     # parser.add_argument("--temperature", type=float, default=0.07, help="Temperature parameter for contrastive loss") # logit_scale 已经包含
 
     # 视觉编码器参数
@@ -350,6 +351,12 @@ if __name__ == "__main__":
         n_layer=args.image_n_layer
     ).to(device)
 
+    image_encoder_vit_pretrained = VisionEncoderPretrained(
+        pretrained_model_name=args.pretrained_model_name,
+        pretrained=True,
+        embed_dim=args.vision_feature_dim
+    ).to(device)
+
     image_encoder_resnet = ModifiedResNet(
         embed_dim=args.resnet_feature_dim,
         n_head=args.image_n_head
@@ -370,6 +377,9 @@ if __name__ == "__main__":
     elif args.image_encoder_type == 'resnet':  # resnet
         image_encoder = image_encoder_resnet
         vision_feature_dim = args.resnet_feature_dim
+    elif args.image_encoder_type == 'vit-pretrained':
+        image_encoder = image_encoder_vit_pretrained
+        vision_feature_dim = args.vision_feature_dim
     else:
         raise ValueError(f"Invalid image encoder type: {args.image_encoder_type}")
 
@@ -380,6 +390,14 @@ if __name__ == "__main__":
         text_feature_dim=args.text_feature_dim,
         embed_dim=args.projection_dim,
     ).to(device)
+
+    # 统计模型参数
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    non_trainable_params = sum(p.numel() for p in model.parameters() if not p.requires_grad)
+    print(f"\nModel Parameters:")
+    print(f"Trainable parameters: {trainable_params:,}")
+    print(f"Non-trainable parameters: {non_trainable_params:,}")
+    print(f"Total parameters: {trainable_params + non_trainable_params:,}\n")
 
     # 如果是评估模式，加载预训练模型
     save_model_path = f"./models/CLIP/checkpoints/my_clip_{args.image_encoder_type}_epoch_{args.num_epochs}.pth"
