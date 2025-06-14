@@ -18,6 +18,55 @@ from model.text_encoder import TextEncoder
 from model.modified_resnet import ModifiedResNet
 from model.clip import CLIP
 
+# 命令行参数解析函数
+def parse_args():
+    """
+    解析命令行参数
+    Returns:
+        args: 解析后的参数
+    """
+    parser = argparse.ArgumentParser(description="Train Custom CLIP Contrastive Model")
+
+    # 路径相关参数
+    parser.add_argument("--image_dir", type=str, default="./data/flickr30k_images/flickr30k_images")
+    parser.add_argument("--text_data_path", type=str, default="./data/flickr30k_images/results.csv")
+    parser.add_argument("--log_dir", type=str, default="./models/CLIP/logs")
+
+    # 训练相关参数
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--num_epochs", type=int, default=1)
+    parser.add_argument("--learning_rate", type=float, default=2e-5)
+    parser.add_argument("--num_workers", type=int, default=4)
+    parser.add_argument("--log_steps", type=int, default=10)
+    parser.add_argument("--eval", action="store_true", help="Run evaluation only")
+    parser.add_argument("--train", action="store_true", help="Run training only")
+    parser.add_argument("--train_sample_rate", type=float, default=0.7, help="train data sample rate")
+    parser.add_argument("--eval_sample_rate", type=float, default=0.3, help="eval data sample rate")
+
+    # 模型相关参数
+    parser.add_argument("--model_name", type=str, default="openai/clip-vit-base-patch32")
+    parser.add_argument("--pretrained_model_name", type=str, default="vit_base_patch16_clip_224.openai")
+    parser.add_argument("--projection_dim", type=int, default=512)
+    parser.add_argument("--max_seq_length", type=int, default=77)
+    parser.add_argument("--image_encoder_type", type=str, default="resnet")
+    # parser.add_argument("--temperature", type=float, default=0.07, help="Temperature parameter for contrastive loss") # logit_scale 已经包含
+
+    # 视觉编码器参数
+    parser.add_argument("--image_size", type=int, default=224)
+    parser.add_argument("--patch_size", type=int, default=16)
+    parser.add_argument("--vision_feature_dim", type=int, default=768)
+    parser.add_argument("--resnet_feature_dim", type=int, default=512)
+    parser.add_argument("--image_n_head", type=int, default=8)
+    parser.add_argument("--image_n_layer", type=int, default=6)
+    
+    # 文本编码器参数
+    parser.add_argument("--vocab_size", type=int, default=49408)
+    parser.add_argument("--text_feature_dim", type=int, default=512)
+    parser.add_argument("--text_n_head", type=int, default=8)
+    parser.add_argument("--text_n_layer", type=int, default=6)
+
+    return parser.parse_args()
+
 # 对比损失函数
 # 由于一个图片有5个文本，所以无法采用常规的交叉熵损失函数
 # class ContrastiveLoss(nn.Module):
@@ -151,47 +200,7 @@ def train(args, model, dataloader, device):
 
 # 6. 主函数
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train Custom CLIP Contrastive Model")
-
-    # 路径相关参数
-    parser.add_argument("--image_dir", type=str, default="./data/flickr30k_images/flickr30k_images")
-    parser.add_argument("--text_data_path", type=str, default="./data/flickr30k_images/results.csv")
-    parser.add_argument("--log_dir", type=str, default="./models/CLIP/logs")
-
-    # 训练相关参数
-    parser.add_argument("--batch_size", type=int, default=16)
-    parser.add_argument("--num_epochs", type=int, default=1)
-    parser.add_argument("--learning_rate", type=float, default=2e-5)
-    parser.add_argument("--num_workers", type=int, default=4)
-    parser.add_argument("--log_steps", type=int, default=10)
-    parser.add_argument("--eval", action="store_true", help="Run evaluation only")
-    parser.add_argument("--train", action="store_true", help="Run training only")
-    parser.add_argument("--train_sample_rate", type=float, default=0.7, help="train data sample rate")
-    parser.add_argument("--eval_sample_rate", type=float, default=0.3, help="eval data sample rate")
-
-    # 模型相关参数
-    parser.add_argument("--model_name", type=str, default="openai/clip-vit-base-patch32")
-    parser.add_argument("--pretrained_model_name", type=str, default="vit_base_patch16_clip_224.openai")
-    parser.add_argument("--projection_dim", type=int, default=512)
-    parser.add_argument("--max_seq_length", type=int, default=77)
-    parser.add_argument("--image_encoder_type", type=str, default="resnet")
-    # parser.add_argument("--temperature", type=float, default=0.07, help="Temperature parameter for contrastive loss") # logit_scale 已经包含
-
-    # 视觉编码器参数
-    parser.add_argument("--image_size", type=int, default=224)
-    parser.add_argument("--patch_size", type=int, default=16)
-    parser.add_argument("--vision_feature_dim", type=int, default=768)
-    parser.add_argument("--resnet_feature_dim", type=int, default=512)
-    parser.add_argument("--image_n_head", type=int, default=8)
-    parser.add_argument("--image_n_layer", type=int, default=6)
-    
-    # 文本编码器参数
-    parser.add_argument("--vocab_size", type=int, default=49408)
-    parser.add_argument("--text_feature_dim", type=int, default=512)
-    parser.add_argument("--text_n_head", type=int, default=8)
-    parser.add_argument("--text_n_layer", type=int, default=6)
-
-    args = parser.parse_args()
+    args = parse_args()
 
     # 设置设备
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -109,16 +109,4 @@ class VGG(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0) # 偏置初始化为0
 
-if __name__ == "__main__":
-    # 测试模型的创建
-    model = VGG('VGG16', num_classes=10)  # 创建VGG16模型实例
-    # 测试模型的前向传播
-    x = torch.randn(1, 3, 224, 224)
-    print("模型输入形状:", x.shape)
-    output = model(x)
-    print("模型输出形状:", output.shape)  # 应该是 (1, 10)
-    # 测试模型的参数数量
-    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print("模型参数数量:", num_params)  # 打印模型的参数数量
-
 
