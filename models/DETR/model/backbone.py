@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor
 import torchvision
 from torchvision.models._utils import IntermediateLayerGetter
 import sys
@@ -16,7 +15,6 @@ class Backbone(nn.Module):
         # 使用torchvision.models的模型作为backbone
         backbone_fn = getattr(torchvision.models, name)
         
-        # 使用新的API初始化模型
         self.body = backbone_fn(
             weights="IMAGENET1K_V2",
             replace_stride_with_dilation=[False, False, dilation],  # 对应layer2,3,4

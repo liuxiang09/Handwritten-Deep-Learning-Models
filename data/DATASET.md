@@ -1,30 +1,35 @@
-# Dataset Download Links
+# 数据集下载链接
 
-## Flickr30k Dataset
-- [Flickr30k Dataset Download Link](https://www.kaggle.com/api/v1/datasets/download/hsankesara/flickr-image-dataset)
+## Flickr30k 数据集
 
-Download the files and extract them to the `data/flickr30k_images/` directory.
-Expected structure:
+- [Flickr30k 数据集下载链接](https://www.kaggle.com/api/v1/datasets/download/hsankesara/flickr-image-dataset)
+
+下载文件并解压到 `data/flickr30k_images/` 目录下。
+期望的目录结构：
+
 ```
 flickr30k_images/
-├── flickr30k_images/...     # Contains all images
-└── results.csv           # Contains image-text pairs
+├── flickr30k_images/...     # 包含所有图片
+└── results.csv           # 包含图片-文本对
 ```
 
-## Pascal VOC Dataset
-- [Pascal VOC Dataset Download Link](https://www.kaggle.com/api/v1/datasets/download/gopalbhattrai/pascal-voc-2012-dataset)
+## Pascal VOC 数据集
 
-Download and extract to the `data/Pascal-VOC/` directory.
-Expected structure:
+- [Pascal VOC 数据集下载链接](https://www.kaggle.com/api/v1/datasets/download/gopalbhattrai/pascal-voc-2012-dataset)
+
+下载并解压到 `data/Pascal-VOC/` 目录下。
+期望的目录结构：
+
 ```
 Pascal-VOC/
 ├── VOCdevkit/
 │   └── VOC2012/
-│       ├── Annotations/
-│       ├── ImageSets/
-│       ├── JPEGImages/
-│       └── SegmentationClass/
+│       ├── Annotations/         # 标注文件
+│       ├── ImageSets/           # 图像集划分
+│       ├── JPEGImages/          # 图片文件
+│       └── SegmentationClass/   # 分割掩码
 ```
 
-## Note
-These datasets are for research purposes only.
+## 注意
+
+这些数据集仅供科研学习用途，使用者的一切其他用途与本项目无关。
