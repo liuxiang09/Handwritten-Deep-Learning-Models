@@ -1,7 +1,10 @@
 import torch
-from configs.config import *
-from model.transformer import Transformer
+import sys
+import os
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from model.transformer import Transformer
+from configs.config import *
 
 
 # 输入矩阵
