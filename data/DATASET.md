@@ -17,11 +17,11 @@ flickr30k_images/
 
 - [Pascal VOC 数据集下载链接](https://www.kaggle.com/api/v1/datasets/download/gopalbhattrai/pascal-voc-2012-dataset)
 
-下载并解压到 `data/Pascal-VOC/` 目录下。
+下载并解压到 `data/Pascal_VOC/` 目录下。
 期望的目录结构：
 
 ```
-Pascal-VOC/
+Pascal_VOC/
 ├── VOCdevkit/
 │   └── VOC2012/
 │       ├── Annotations/         # 标注文件
