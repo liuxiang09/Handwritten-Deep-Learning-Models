@@ -8,11 +8,11 @@
 
 ## 📑 目录
 
-- [PyTorch 训练](#pytorch训练)
+- [PyTorch 训练](#pytorch-训练)
   - [📑 目录](#-目录)
   - [🚀 项目目标](#-项目目标)
   - [📦 项目结构](#-项目结构)
-  - [✨ 已实现模型](#-已实现模型)
+  - [✨ 模型列表](#-模型列表)
     - [1. VGG (2014)](#1-vgg-2014)
     - [2. ResNet (2015)](#2-resnet-2015)
     - [3. Fast R-CNN (2015)](#3-fast-r-cnn-2015)
@@ -295,19 +295,19 @@ PyTorch/
 ### 模型训练
 
 ```bash
-python models/<模型名称>/train.py --epochs 20 --batch_size 32 --lr 0.001 --device cuda
+python models/CLIP/train.py --train
 ```
 
 ### 模型评估
 
 ```bash
-python models/<模型名称>/eval.py --checkpoint checkpoints/<模型名称>_model.pth --batch_size 64 --device cuda
+python models/CLIP/train.py --eval
 ```
 
 ### 模型推理
 
 ```bash
-python models/<模型名称>/inference.py --checkpoint checkpoints/<模型名称>_model.pth --input_data <输入数据路径> --output_dir <输出目录>
+python models/CLIP/inference.py
 ```
 
 ## 🤝 贡献

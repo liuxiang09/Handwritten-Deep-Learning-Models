@@ -33,8 +33,7 @@ class EncoderLayer(nn.Module):
     Transformer Encoder的基础层。
     包含：自注意力 (Self-Attention) -> Add&Norm -> 前馈网络 (FFN) -> Add&Norm
     """
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu"):
+    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         
@@ -55,17 +54,18 @@ class EncoderLayer(nn.Module):
         """将位置编码添加到输入张量中。"""
         return tensor + pos
 
-    def forward(
-                self,
+    def forward(self,
                 src: torch.Tensor,
                 pos: torch.Tensor,
                 src_mask: Optional[torch.Tensor] = None,
-                src_key_padding_mask: Optional[torch.Tensor] = None
-        ):
+                src_key_padding_mask: Optional[torch.Tensor] = None):
         # 在输入给自注意力前加上位置编码
         q = k = self.add_pos_encoding(src, pos)
         # 自注意力
-        src2 = self.self_attn(q, k, value=src, attn_mask=src_mask,
+        src2 = self.self_attn(query=q, 
+                              key=k, 
+                              value=src, 
+                              attn_mask=src_mask, 
                               key_padding_mask=src_key_padding_mask)[0]
         # ADD & Norm
         src = src + self.dropout1(src2)
@@ -83,8 +83,12 @@ class DecoderLayer(nn.Module):
     Transformer Decoder的基础层。
     包含：自注意力 -> Add&Norm -> 交叉注意力 -> Add&Norm -> 前馈网络 -> Add&Norm
     """
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 activation="relu"):
+    def __init__(self, 
+                 d_model: int, 
+                 nhead: int, 
+                 dim_feedforward: int = 2048, 
+                 dropout: float = 0.1,
+                 activation: str = "relu"):
         super().__init__()
         # Decoder的自注意力，关注对象是Object Queries
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -110,16 +114,22 @@ class DecoderLayer(nn.Module):
         """将位置编码添加到输入张量中。"""
         return tensor + pos
 
-    def forward(self, tgt: torch.Tensor, memory: torch.Tensor,
-                     pos: torch.Tensor, query_pos: torch.Tensor,
-                     tgt_mask: Optional[torch.Tensor] = None,
-                     memory_mask: Optional[torch.Tensor] = None,
-                     tgt_key_padding_mask: Optional[torch.Tensor] = None,
-                     memory_key_padding_mask: Optional[torch.Tensor] = None):
+    def forward(self, 
+                tgt: torch.Tensor, 
+                memory: torch.Tensor,
+                query_pos: torch.Tensor,
+                pos: torch.Tensor, 
+                tgt_mask: Optional[torch.Tensor] = None,
+                memory_mask: Optional[torch.Tensor] = None,
+                tgt_key_padding_mask: Optional[torch.Tensor] = None,
+                memory_key_padding_mask: Optional[torch.Tensor] = None):
         # 1. Decoder自注意力 (Q, K, V都是Object Queries)
         # 在输入给注意力层之前，给Q和K加上Object Queries的位置编码(query_pos)
         q = k = self.add_pos_encoding(tgt, query_pos)
-        tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
+        tgt2 = self.self_attn(query=q, 
+                              key=k, 
+                              value=tgt, 
+                              attn_mask=tgt_mask, 
                               key_padding_mask=tgt_key_padding_mask)[0]
         # Add & Norm
         tgt = tgt + self.dropout1(tgt2)
@@ -130,12 +140,12 @@ class DecoderLayer(nn.Module):
         # K加上图像特征的位置编码(pos)
         tgt2 = self.multihead_attn(query=self.add_pos_encoding(tgt, query_pos),
                                    key=self.add_pos_encoding(memory, pos),
-                                   value=memory, attn_mask=memory_mask,
+                                   value=memory, 
+                                   attn_mask=memory_mask,
                                    key_padding_mask=memory_key_padding_mask)[0]
         # Add & Norm
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
-        
         # 3. 前馈网络
         tgt2 = self.ffn(tgt)
         # Add & Norm
@@ -152,40 +162,52 @@ class Encoder(nn.Module):
     """
     由多个EncoderLayer堆叠而成的完整Encoder。
     """
-    def __init__(self, encoder_layer, num_layers, norm=None):
+    def __init__(self, encoder_layer: EncoderLayer, num_layers: int, norm: Optional[nn.Module] = None):
         super().__init__()
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
 
-    def forward(self, src: torch.Tensor, pos: torch.Tensor,
+    def forward(self, 
+                src: torch.Tensor, 
+                pos: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
                 src_key_padding_mask: Optional[torch.Tensor] = None):
+        
         output = src
-
+        # 多层EncoderLayer堆叠
         for layer in self.layers:
-            output = layer(output, pos, src_mask=mask,
+            output = layer(output, 
+                           pos, 
+                           src_mask=mask,
                            src_key_padding_mask=src_key_padding_mask)
 
         if self.norm is not None:
             output = self.norm(output)
 
-        return output
+        return output # [H*W, B, C]
 
 
 class Decoder(nn.Module):
     """
     由多个DecoderLayer堆叠而成的完整Decoder。
     """
-    def __init__(self, decoder_layer, num_layers, norm=None, return_intermediate=False):
+    def __init__(self, 
+                 decoder_layer: DecoderLayer, 
+                 num_layers: int, norm: Optional[nn.Module] = None, 
+                 return_intermediate: bool = False):
+        
         super().__init__()
         self.layers = _get_clones(decoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
         self.return_intermediate = return_intermediate
 
-    def forward(self, tgt: torch.Tensor, memory: torch.Tensor, 
-                pos: torch.Tensor, query_pos: torch.Tensor,
+    def forward(self, 
+                tgt: torch.Tensor, 
+                memory: torch.Tensor, 
+                query_pos: torch.Tensor,
+                pos: torch.Tensor, 
                 tgt_mask: Optional[torch.Tensor] = None,
                 memory_mask: Optional[torch.Tensor] = None,
                 tgt_key_padding_mask: Optional[torch.Tensor] = None,
@@ -194,24 +216,32 @@ class Decoder(nn.Module):
         intermediate = []
 
         for layer in self.layers:
-            output = layer(output, memory, pos=pos, query_pos=query_pos, 
-                           tgt_mask=tgt_mask, memory_mask=memory_mask,
+            output = layer(output, 
+                           memory, 
+                           query_pos=query_pos, 
+                           pos=pos,
+                           tgt_mask=tgt_mask, 
+                           memory_mask=memory_mask,
                            tgt_key_padding_mask=tgt_key_padding_mask,
                            memory_key_padding_mask=memory_key_padding_mask)
+            
             if self.return_intermediate:
                 # 将每一层decoder的输出都保存下来
                 intermediate.append(self.norm(output))
-
+        # 应用层归一化（如果存在）
         if self.norm is not None:
             output = self.norm(output)
             if self.return_intermediate:
-                intermediate.pop()
-                intermediate.append(output)
-
+                # 如果需要返回中间结果，则用最终归一化后的输出替换最后一个中间结果
+                intermediate[-1] = output
+        
+        # 根据配置返回不同格式的结果
         if self.return_intermediate:
-            return torch.stack(intermediate)
-
-        return output.unsqueeze(0)
+            # 将所有中间层输出堆叠成一个张量 [num_layers, batch_size, num_queries, hidden_dim]
+            return torch.stack(intermediate, dim=0)
+        else:
+            # 如果不需要中间结果，则只返回最后一层的输出，并添加一个维度以保持一致的返回格式
+            return output.unsqueeze(0)
 
 
 # ==============================================================================
@@ -222,22 +252,25 @@ class Transformer(nn.Module):
     """
     DETR中完整的Transformer模块，整合了Encoder和Decoder。
     """
-    def __init__(self, d_model=512, nhead=8, num_encoder_layers=6,
-                 num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
-                 activation="relu", return_intermediate_dec=False):
+    def __init__(self, 
+                 d_model: int = 512, 
+                 nhead: int = 8, 
+                 num_encoder_layers: int = 6,
+                 num_decoder_layers: int = 6, 
+                 dim_feedforward: int = 2048, 
+                 dropout: float = 0.1,
+                 activation: str = "relu", 
+                 return_intermediate_dec: bool = False):
         super().__init__()
 
         # --- Encoder ---
-        encoder_layer = EncoderLayer(d_model, nhead, dim_feedforward,
-                                     dropout, activation)
+        encoder_layer = EncoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
         self.encoder = Encoder(encoder_layer, num_encoder_layers)
 
         # --- Decoder ---
-        decoder_layer = DecoderLayer(d_model, nhead, dim_feedforward,
-                                     dropout, activation)
+        decoder_layer = DecoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
         decoder_norm = nn.LayerNorm(d_model)
-        self.decoder = Decoder(decoder_layer, num_decoder_layers, decoder_norm,
-                               return_intermediate=return_intermediate_dec)
+        self.decoder = Decoder(decoder_layer, num_decoder_layers, norm=decoder_norm, return_intermediate=return_intermediate_dec)
 
         self._reset_parameters()
 
@@ -246,10 +279,11 @@ class Transformer(nn.Module):
 
     def _reset_parameters(self):
         for p in self.parameters():
+            # dim>1 说明不是bias
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, src, mask, query_embed, pos_embed):
+    def forward(self, src: torch.Tensor, mask: torch.Tensor, query_embed: torch.Tensor, pos_embed: torch.Tensor):
         """
         Args:
             src (Tensor): Backbone的输出特征. [B, C, H, W]
@@ -278,7 +312,7 @@ class Transformer(nn.Module):
         tgt = torch.zeros_like(query_embed)
 
         # --- Encoder前向传播 ---
-        # memory 是编码后的图像特征
+        # memory 是编码后的图像特征 [H*W, B, C]
         memory = self.encoder(src, pos=pos_embed, src_key_padding_mask=mask)
 
         # --- Decoder前向传播 ---
@@ -286,8 +320,8 @@ class Transformer(nn.Module):
         hs = self.decoder(tgt, memory, pos=pos_embed, query_pos=query_embed, memory_key_padding_mask=mask)
         
         # --- 输出格式整理 ---
-        # hs: [num_layers, B, num_queries, C]
-        # memory: [B, C, H, W]
+        # hs: [num_layers, B, num_queries, C] 或 [1, B, num_queries, C]
+        # memory: [H*W, B, C] -> [B, C, H, W]
         return hs, memory.permute(1, 2, 0).view(bs, c, h, w)
 
 
@@ -304,5 +338,5 @@ def build_transformer(args):
         dim_feedforward=args.dim_feedforward,
         num_encoder_layers=args.enc_layers,
         num_decoder_layers=args.dec_layers,
-        return_intermediate_dec=True,
+        return_intermediate_dec=args.return_intermediate_dec, # 是否返回中间结果
     )
