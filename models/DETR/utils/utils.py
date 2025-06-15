@@ -78,17 +78,4 @@ def generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     area = wh[:, :, 0] * wh[:, :, 1]
     return iou - (area - union) / (area + 1e-6)
 
-class MLP(nn.Module):
-    """
-    一个简单的多层感知器(MLP)。
-    """
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int):
-        super().__init__()
-        self.num_layers = num_layers
-        h = [hidden_dim] * (num_layers - 1)
-        self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
 
-    def forward(self, x: Tensor) -> Tensor:
-        for i, layer in enumerate(self.layers):
-            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x) # 最后一层不使用ReLU激活函数
-        return x

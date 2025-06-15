@@ -10,7 +10,7 @@
 ```
 flickr30k_images/
 ├── flickr30k_images/...     # 包含所有图片
-└── results.csv           # 包含图片-文本对
+└── results.csv              # 包含图片-文本对
 ```
 
 ## Pascal VOC 数据集
@@ -22,12 +22,20 @@ flickr30k_images/
 
 ```
 Pascal_VOC/
-├── VOCdevkit/
-│   └── VOC2012/
+├── VOC2012_train_val/
+│   └── VOC2012_train_val/
 │       ├── Annotations/         # 标注文件
 │       ├── ImageSets/           # 图像集划分
 │       ├── JPEGImages/          # 图片文件
-│       └── SegmentationClass/   # 分割掩码
+│       ├── SegmentationClass/   # 语义分割掩码
+│       └── SegmentationObject   # 实例分割掩码
+│
+└── VOC2012_test/
+    └── VOC2012_test/
+        ├── Annotations/         # 标注文件
+        ├── ImageSets/           # 图像集划分
+        └── JPEGImages/          # 图片文件
+        
 ```
 
 ## 注意

@@ -216,7 +216,7 @@ class Decoder(nn.Module):
         intermediate = []
 
         for layer in self.layers:
-            output = layer(output, 
+            output = layer(output, # [num_queries, B, C]
                            memory, 
                            query_pos=query_pos, 
                            pos=pos,
@@ -332,7 +332,7 @@ class Transformer(nn.Module):
 def build_transformer(args):
     """根据参数构建Transformer模型"""
     return Transformer(
-        d_model=args.hidden_dim,
+        d_model=args.transformer_dim,
         dropout=args.dropout,
         nhead=args.nheads,
         dim_feedforward=args.dim_feedforward,

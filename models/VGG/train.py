@@ -14,7 +14,6 @@ def parse_args():
     # 路径相关参数
     parser.add_argument('--data_dir', type=str, default='./data', help='Data directory')
     parser.add_argument('--save_dir', type=str, default='./models/VGG/checkpoints', help='Directory to save model')
-    parser.add_argument('--checkpoint', type=str, default='./models/VGG/checkpoints/vgg11_cifar10_epoch_1.pth', help='Checkpoint path for evaluation')
     
     # 模型相关参数
     parser.add_argument('--model', type=str, default='VGG11',choices=['VGG11', 'VGG13', 'VGG16', 'VGG19'], help='VGG model variant (VGG11, VGG13, VGG16, VGG19)')
@@ -22,13 +21,13 @@ def parse_args():
     
     # 训练和评估相关参数
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for training')
-    parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train')
+    parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train')
     parser.add_argument('--sgd_lr', type=float, default=0.01, help='Learning rate')
     parser.add_argument('--sgd_momentum', type=float, default=0.9, help='Momentum for SGD optimizer')
     parser.add_argument('--sgd_weight_decay', type=float, default=5e-4, help='Weight decay')
-    parser.add_argument('--adam_lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--adam_lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--adam_weight_decay', type=float, default=1e-4, help='Weight decay')
-    parser.add_argument('--optimizer', type=str, default='sgd', choices=['sgd', 'adam'], help='Optimizer type')
+    parser.add_argument('--optimizer', type=str, default='adam', choices=['sgd', 'adam'], help='Optimizer type')
     parser.add_argument('--train', action='store_true', help='Train the model')
     parser.add_argument('--eval', action='store_true', help='Evaluate the model')
     parser.add_argument('--log_steps', type=int, default=50, help='Log every N steps')
@@ -86,6 +85,8 @@ def train(args, model, train_loader, device):
             outputs = model(img) # [B, C]
             loss = criterion(outputs, label)
             loss.backward()
+            # 在反向传播和优化器更新之前，使用梯度裁剪
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
             
             running_loss += loss.item()
@@ -180,13 +181,16 @@ def main():
     
     # 评估模型
     if args.eval:
-        if args.checkpoint:
-            print(f"Loading model from {args.checkpoint}")
-            model.load_state_dict(torch.load(args.checkpoint))
+        # 自动生成 checkpoint 路径
+        checkpoint_name = f"{args.model.lower()}_{args.dataset.lower()}_epoch_{args.epochs}.pth"
+        checkpoint_path = os.path.join(args.save_dir, checkpoint_name)
+        if os.path.exists(checkpoint_path):
+            print(f"Loading model from {checkpoint_path}")
+            model.load_state_dict(torch.load(checkpoint_path))
             print("Evaluating model")
             evaluate(args, model, test_loader, device)
         else:
-            raise ValueError("checkpoint is not provided")
+            raise ValueError(f"Checkpoint not found: {checkpoint_path}")
 
 if __name__ == "__main__":
     main()
