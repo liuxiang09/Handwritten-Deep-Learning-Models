@@ -11,6 +11,13 @@ from DETR.utils.utils import NestedTensor
 
 class Backbone(nn.Module):
     def __init__(self, name: str = "resnet50", train_backbone: bool = True, return_interm_layers: bool = False, dilation: bool = False):
+        """
+        Args:
+            name: 使用的backbone模型，如"resnet50"
+            train_backbone: 是否训练backbone
+            return_interm_layers: 是否返回中间层的特征
+            dilation: 是否使用dilation卷积
+        """
         super().__init__()
         # 使用torchvision.models的模型作为backbone
         backbone_fn = getattr(torchvision.models, name)
@@ -42,7 +49,7 @@ class Backbone(nn.Module):
         # 是否返回中间层的特征
         self.return_interm_layers = return_interm_layers
         
-        # 使用的输出层
+        # 为FPN设计，但是暂未使用，return_interm_layers=False
         if return_interm_layers:
             # 返回多个特征层用于FPN
             # layer1返回: [B, 256, 56, 56]
@@ -57,10 +64,22 @@ class Backbone(nn.Module):
         self.body = IntermediateLayerGetter(self.body, return_layers=return_layers)
         
         # 记录输出通道数和步长
-        self.num_channels = 2048  # ResNet的输出通道数
-        self.strides = [32]  # ResNet最后一层的总步长
+        self.num_channels = 2048  # C = 2048
+        self.strides = [32]
         
     def forward(self, x: NestedTensor):
+        """
+        Args:
+            x: NestedTensor包含:
+               - tensors: [B, 3, H, W] - 输入图像
+               - mask: [B, H, W] - 填充掩码(1表示填充区域)
+        
+        Returns:
+            out: 包含多个特征层的NestedTensor字典
+               - 键为特征层名称，值为NestedTensor对象，包含:
+                 - tensors: [B, C, H/32, W/32] - 特征图
+                 - mask: [B, H/32, W/32] - 填充掩码
+        """
         # 处理图像特征
         tensors = x.tensors
         features = self.body(tensors) # [B, C, H, W]

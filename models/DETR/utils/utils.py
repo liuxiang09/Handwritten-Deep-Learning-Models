@@ -70,11 +70,14 @@ def generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     """
     计算两个box的Generalized IoU(广义交并比)。
     """
+    # 确保boxes1和boxes2都不为空
+    assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
+    assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
     iou, union = box_iou(boxes1, boxes2)
     # 注意这里计算方式与上面有所不同，这里是找到最小闭包框
     lt = torch.min(boxes1[:, None, :2], boxes2[:, :2])
     rb = torch.max(boxes1[:, None, 2:], boxes2[:, 2:])
-    wh = (rb - lt).clamp(min=0)
+    wh = (rb - lt).clamp(min=0) # clamp(min=0) 确保wh不会为负
     area = wh[:, :, 0] * wh[:, :, 1]
     return iou - (area - union) / (area + 1e-6)
 

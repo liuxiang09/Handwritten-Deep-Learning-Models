@@ -25,7 +25,7 @@ class PositionEmbeddingSine(nn.Module):
         Args:
             tensor: NestedTensor对象，包含'tensor'和'mask'属性
         Returns:
-            pos: [B, C, H, W] 位置编码
+            pos: [B, hidden_dim, H, W] 位置编码
         """
         mask = tensor.mask  # [B, H, W]，True表示padding
         not_mask = ~mask  # 反转mask，False表示padding位置

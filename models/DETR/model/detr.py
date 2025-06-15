@@ -12,9 +12,7 @@ from model.position_encoding import PositionEmbeddingSine
 from utils.utils import NestedTensor
 
 class MLP(nn.Module):
-    """
-    一个简单的多层感知器(MLP)。
-    """
+    """简单的多层感知器"""
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int):
         super().__init__()
         self.num_layers = num_layers
@@ -22,102 +20,86 @@ class MLP(nn.Module):
         self.layers = nn.ModuleList(nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim]))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: [batch_size, ..., input_dim]
         for i, layer in enumerate(self.layers):
-            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x) # 最后一层不使用ReLU激活函数
+            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        # 输出: [batch_size, ..., output_dim]
         return x
 
 class DETR(nn.Module):
     """
-    DETR 主模块，负责整合所有组件
+    DETR: DEtection TRansformer - 使用Transformer进行端到端目标检测
+    文档中给出了DETR的张量数据流，很大程度帮助理解DETR的整个流程
+    Google gemini canvas 文档: https://gemini.google.com/share/40c494881840
     """
     def __init__(self,
                  backbone: Backbone,
                  transformer: Transformer,
                  num_classes: int,
                  num_queries: int,
-                 return_intermediate_dec: bool = False,
-                 ):
-        """
-        Args:
-            backbone: 骨干网络
-            transformer: 变压器
-            num_classes: 类别数
-            num_queries: 查询数
-            return_intermediate_dec: 是否返回中间解码层的输出
-        """
+                 return_intermediate_dec: bool = False):
+        
         super().__init__()
         self.backbone = backbone
         self.transformer = transformer
         self.num_classes = num_classes
         self.num_queries = num_queries
-        self.return_intermediate_dec = return_intermediate_dec
-
-        # 从transformer中获取隐藏维度
         hidden_dim = transformer.d_model
         
-        # --- 预测头 (Prediction Heads) ---
-        # 类别预测头: +1 是为了 "no object" (无目标) 这个背景类别
-        self.class_embed = nn.Linear(hidden_dim, num_classes + 1)
+        # 预测头
+        self.class_head = nn.Linear(hidden_dim, num_classes + 1)  # +1表示"无目标"类别
+        self.bbox_head = MLP(hidden_dim, hidden_dim, 4, 3)  # 预测归一化的边界框坐标(cx,cy,w,h)
         
-        # 边界框预测头: 使用一个3层的MLP
-        self.bbox_embed = MLP(input_dim=hidden_dim, hidden_dim=hidden_dim, output_dim=4, num_layers=3)
-        
-        # --- 组件 ---
-        # Object Queries: 可学习的查询向量
+        # 可学习的对象查询
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         
-        # 输入投影层: 将backbone的输出通道数 (如ResNet50的2048) 降维到transformer的输入维度
-        # 使用1x1卷积实现
+        # 特征投影和位置编码
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
+        self.pos_encoding = PositionEmbeddingSine(num_pos_feats=hidden_dim // 2, normalize=True)
+        
+        # 确保transformer的d_model等于位置编码num_pos_feats的2倍
+        assert hidden_dim == self.pos_encoding.num_pos_feats * 2, f"Transformer的hidden_dim({hidden_dim})必须等于位置编码num_pos_feats({self.pos_encoding.num_pos_feats})的2倍"
+        
+        if return_intermediate_dec:
+            self.transformer.decoder.return_intermediate = return_intermediate_dec
+        self.return_intermediate_dec = return_intermediate_dec
 
     def forward(self, x: NestedTensor):
         """
-        模型的完整前向传播流程。
-        
         Args:
-            x (NestedTensor): 包含 'tensors' 和 'mask' 的输入对象。
-                - tensors: [B, 3, H, W]
-                - mask: [B, H, W]
+            x: NestedTensor包含:
+               - tensors: [B, 3, H, W] - 输入图像
+               - mask: [B, H, W] - 填充掩码(1表示填充区域)
         
         Returns:
-            dict: 包含预测结果的字典
-                - 'pred_logits': [B, num_queries, num_classes + 1] 分类预测
-                - 'pred_boxes': [B, num_queries, 4] 边界框预测 (cx, cy, w, h)
-                - 'aux_outputs' (if training): 一个列表，包含解码器每个中间层的预测结果
+            dict: 包含预测结果
         """
-        # 1. 通过Backbone提取特征
-        features = self.backbone(x) # features 是一个字典
+        # 1. 特征提取
+        features = self.backbone(x)  # 返回字典
+        src = features['0']  # [B, C, H/32, W/32] 特征图
         
-        # 只取最后一层的特征和mask
-        # src: NestedTensor(tensor, mask)
-        src = features['0']
+        # 2. 位置编码--不会用到src.tensors，只会用到src.mask，得到的通道数与src.tensors的C通道数无关
+        pos_embed = self.pos_encoding(src)  # [B, hidden_dim, H/32, W/32]
         
-        # 2. 生成位置编码 (这里直接在外面构建好传入，或者在模型内部构建)
-        # 假设位置编码模块已经构建好并命名为 pos_encoding
-        # pos_embed = self.pos_encoding(src) # 这通常在主训练循环中完成，然后传入
-        
-        # 3. 将特征图、mask和位置编码传入Transformer
-        # 注意：这里的 pos_embed 需要在外部生成并传入
-        # 为了演示，我们暂时在这里创建一个（实际应在外部build）
-        pos_encoding_module = PositionEmbeddingSine(num_pos_feats=self.transformer.d_model // 2, normalize=True)
-        pos_embed = pos_encoding_module(src)
-        
+        # 3. Transformer处理
+        # proj_src: [B, hidden_dim, H/32, W/32]
+        # mask: [B, H/32, W/32]
+        # query_embed: [num_queries, hidden_dim]
+        # pos_embed: [B, hidden_dim, H/32, W/32]
         hs, _ = self.transformer(self.input_proj(src.tensors), src.mask, self.query_embed.weight, pos_embed)
-        # hs shape: [num_layers, B, num_queries, C]
+        # hs: [num_decoder_layers, B, num_queries, hidden_dim]
         
-        # 4. 通过预测头得到最终输出
-        outputs_class = self.class_embed(hs) # 分类 logits
-        outputs_coord = self.bbox_embed(hs).sigmoid() # 边界框坐标 (归一化到 0-1)
+        # 4. 预测头输出
+        outputs_class = self.class_head(hs)  # [num_layers, B, num_queries, num_classes+1]
+        outputs_coord = self.bbox_head(hs).sigmoid()  # [num_layers, B, num_queries, 4]
         
-        # 整理输出格式
-        # out['pred_logits'] 是最后一层decoder的输出
-        # out['pred_boxes'] 是最后一层decoder的输出
+        # 5. 只取最后一层输出
         out = {
-            'pred_logits': outputs_class[-1], 
-            'pred_boxes': outputs_coord[-1]
+            'pred_logits': outputs_class[-1],  # [B, num_queries, num_classes+1]
+            'pred_boxes': outputs_coord[-1]    # [B, num_queries, 4]
         }
         
-        # 如果需要返回中间层结果（用于辅助损失计算）
+        # 辅助损失(训练时使用)
         if self.return_intermediate_dec:
             out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
             
@@ -125,7 +107,7 @@ class DETR(nn.Module):
 
     @torch.jit.unused
     def _set_aux_loss(self, outputs_class, outputs_coord):
-        # 将解码器除最后一层外的所有中间层输出打包，用于计算辅助损失
+        # 收集中间层输出用于辅助损失，返回一个字典列表
         return [{'pred_logits': a, 'pred_boxes': b}
                 for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
     

@@ -195,13 +195,13 @@ class Decoder(nn.Module):
     def __init__(self, 
                  decoder_layer: DecoderLayer, 
                  num_layers: int, norm: Optional[nn.Module] = None, 
-                 return_intermediate: bool = False):
+                 return_intermediate_dec: bool = False):
         
         super().__init__()
         self.layers = _get_clones(decoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
-        self.return_intermediate = return_intermediate
+        self.return_intermediate_dec = return_intermediate_dec
 
     def forward(self, 
                 tgt: torch.Tensor, 
@@ -225,18 +225,18 @@ class Decoder(nn.Module):
                            tgt_key_padding_mask=tgt_key_padding_mask,
                            memory_key_padding_mask=memory_key_padding_mask)
             
-            if self.return_intermediate:
+            if self.return_intermediate_dec:
                 # 将每一层decoder的输出都保存下来
                 intermediate.append(self.norm(output))
         # 应用层归一化（如果存在）
         if self.norm is not None:
             output = self.norm(output)
-            if self.return_intermediate:
+            if self.return_intermediate_dec:
                 # 如果需要返回中间结果，则用最终归一化后的输出替换最后一个中间结果
                 intermediate[-1] = output
         
         # 根据配置返回不同格式的结果
-        if self.return_intermediate:
+        if self.return_intermediate_dec:
             # 将所有中间层输出堆叠成一个张量 [num_layers, batch_size, num_queries, hidden_dim]
             return torch.stack(intermediate, dim=0)
         else:
@@ -253,11 +253,11 @@ class Transformer(nn.Module):
     DETR中完整的Transformer模块，整合了Encoder和Decoder。
     """
     def __init__(self, 
-                 d_model: int = 512, 
+                 d_model: int = 256, # 原始论文就是d_model=256
                  nhead: int = 8, 
                  num_encoder_layers: int = 6,
                  num_decoder_layers: int = 6, 
-                 dim_feedforward: int = 2048, 
+                 dim_feedforward: int = 2048, # DETR原始论文中，并没有设置为d_model的4倍，而是2048
                  dropout: float = 0.1,
                  activation: str = "relu", 
                  return_intermediate_dec: bool = False):
@@ -270,7 +270,7 @@ class Transformer(nn.Module):
         # --- Decoder ---
         decoder_layer = DecoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
         decoder_norm = nn.LayerNorm(d_model)
-        self.decoder = Decoder(decoder_layer, num_decoder_layers, norm=decoder_norm, return_intermediate=return_intermediate_dec)
+        self.decoder = Decoder(decoder_layer, num_decoder_layers, norm=decoder_norm, return_intermediate_dec=return_intermediate_dec)
 
         self._reset_parameters()
 
@@ -317,7 +317,8 @@ class Transformer(nn.Module):
 
         # --- Decoder前向传播 ---
         # hs 是每一层decoder的输出
-        hs = self.decoder(tgt, memory, pos=pos_embed, query_pos=query_embed, memory_key_padding_mask=mask)
+        # 关键：query_pos是Object Queries的位置编码，pos是图像特征的位置编码
+        hs = self.decoder(tgt, memory, query_pos=query_embed, pos=pos_embed, memory_key_padding_mask=mask)
         
         # --- 输出格式整理 ---
         # hs: [num_layers, B, num_queries, C] 或 [1, B, num_queries, C]

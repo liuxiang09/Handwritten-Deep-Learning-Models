@@ -46,12 +46,6 @@ def test_backbone():
     print(f"标准 Backbone 训练参数: {trainable_params:,}")
     print(f"标准 Backbone 冻结参数: {non_trainable_params:,}")
     print(f"标准 Backbone 总参数: {trainable_params + non_trainable_params:,}\n")
-    
-    trainable_params = sum(p.numel() for p in backbone_interm.parameters() if p.requires_grad)
-    non_trainable_params = sum(p.numel() for p in backbone_interm.parameters() if not p.requires_grad)
-    print(f"返回中间层的 Backbone 训练参数: {trainable_params:,}")
-    print(f"返回中间层的 Backbone 冻结参数: {non_trainable_params:,}")
-    print(f"返回中间层的 Backbone 总参数: {trainable_params + non_trainable_params:,}\n")
 
     print("\nBackbone 测试完成")
 
