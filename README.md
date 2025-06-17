@@ -17,19 +17,6 @@
   - [🚀 项目目标](#-项目目标)
   - [📦 项目结构](#-项目结构)
   - [✨ 模型列表](#-模型列表)
-    - [1. VGG (2014)](#1-vgg-2014)
-    - [2. ResNet (2015)](#2-resnet-2015)
-    - [3. Fast R-CNN (2015)](#3-fast-r-cnn-2015)
-    - [4. Faster R-CNN (2015)](#4-faster-r-cnn-2015)
-    - [5. Transformer (2017)](#5-transformer-2017)
-    - [6. Mask R-CNN (2017)](#6-mask-r-cnn-2017)
-    - [7. ViT (2020)](#7-vit-2020)
-    - [8. DETR (2020)](#8-detr-2020)
-    - [9. Deformable DETR (2020)](#9-deformable-detr-2020)
-    - [10. CLIP (2021)](#10-clip-2021)
-    - [11. ViLT (2021)](#11-vilt-2021)
-    - [12. Mask2Former (2021)](#12-mask2former-2021)
-    - [13. SAM (2023)](#13-sam-2023)
   - [📚 学习计划 (未来)](#-学习计划-未来)
   - [🛠️ 环境配置](#️-环境配置)
   - [💡 使用指南 (示例)](#-使用指南-示例)
@@ -188,7 +175,7 @@ PyTorch/
   </tr>
 </table>
 
-### 1. VGG (2014) {#1-vgg-2014}
+### 1. VGG (2014)
 
 <details>
 <summary>查看详情</summary>
@@ -205,7 +192,7 @@ PyTorch/
   - 提供了模型训练、验证和测试的完整流程
   </details>
 
-### 2. ResNet (2015) {#2-resnet-2015}
+### 2. ResNet (2015)
 
 <details>
 <summary>查看详情</summary>
@@ -218,7 +205,7 @@ PyTorch/
 - **当前进度:** 正在设计模型架构。
 </details>
 
-### 3. Fast R-CNN (2015) {#3-fast-r-cnn-2015}
+### 3. Fast R-CNN (2015)
 
 <details>
 <summary>查看详情</summary>
@@ -231,7 +218,7 @@ PyTorch/
 - **当前进度:** 暂无
 </details>
 
-### 4. Faster R-CNN (2015) {#4-faster-r-cnn-2015}
+### 4. Faster R-CNN (2015)
 
 <details>
 <summary>查看详情</summary>
@@ -244,7 +231,7 @@ PyTorch/
 - **当前进度:** 暂无
 </details>
 
-### 5. Transformer (2017) {#5-transformer-2017}
+### 5. Transformer (2017)
 
 <details>
 <summary>查看详情</summary>
@@ -261,7 +248,7 @@ PyTorch/
   - 实现了基于贪婪解码策略的自回归输出
   </details>
 
-### 6. Mask R-CNN (2017) {#6-mask-r-cnn-2017}
+### 6. Mask R-CNN (2017)
 
 <details>
 <summary>查看详情</summary>
@@ -274,7 +261,7 @@ PyTorch/
 - **当前进度:** 暂无。
 </details>
 
-### 7. ViT (2020) {#7-vit-2020}
+### 7. ViT (2020)
 
 <details>
 <summary>查看详情</summary>
@@ -287,7 +274,7 @@ PyTorch/
 - **当前进度:** 使用 Hugging Face Transformers 库实现了完整训练流程
 </details>
 
-### 8. DETR (2020) {#8-detr-2020}
+### 8. DETR (2020)
 
 <details>
 <summary>查看详情</summary>
@@ -300,7 +287,7 @@ PyTorch/
 - **当前进度:** 正在设计模型架构和训练流程。
 </details>
 
-### 9. Deformable DETR (2020) {#9-deformable-detr-2020}
+### 9. Deformable DETR (2020)
 
 <details>
 <summary>查看详情</summary>
@@ -313,7 +300,7 @@ PyTorch/
 - **当前进度:** 暂无
 </details>
 
-### 10. CLIP (2021) {#10-clip-2021}
+### 10. CLIP (2021)
 
 <details>
 <summary>查看详情</summary>
@@ -329,7 +316,7 @@ PyTorch/
   - 实现了单个图像 -- 5 个文本的对比损失
   </details>
 
-### 11. ViLT (2021) {#11-vilt-2021}
+### 11. ViLT (2021)
 
 <details>
 <summary>查看详情</summary>
@@ -342,7 +329,7 @@ PyTorch/
 - **当前进度:** 已有推理脚本框架，正在设计模型架构。
 </details>
 
-### 12. Mask2Former (2021) {#12-mask2former-2021}
+### 12. Mask2Former (2021)
 
 <details>
 <summary>查看详情</summary>
@@ -355,7 +342,7 @@ PyTorch/
 - **当前进度:** 暂无
 </details>
 
-### 13. SAM (2023) {#13-sam-2023}
+### 13. SAM (2023)
 
 <details>
 <summary>查看详情</summary>
