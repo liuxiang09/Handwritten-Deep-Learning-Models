@@ -1,7 +1,7 @@
 # PyTorch 训练
 
 <div align="center">
-  <img src="logo.png" alt="PyTorch Training Logo" width="180px">
+  <img src="logo.png" alt="PyTorch Training Logo" width="250px">
 </div>
 
 > 这是一个用于学习和实践 PyTorch 深度学习框架的个人项目仓库。本仓库将逐步实现和训练各种深度学习模型，并最终融入 Hugging Face Transformers 的学习与应用。
