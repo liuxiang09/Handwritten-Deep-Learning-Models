@@ -90,84 +90,42 @@ PyTorch/
     <td>CIFAR-10, CIFAR-100</td>
   </tr>
   <tr>
-    <td><strong>2. ResNet</strong></td>
-    <td>🚧 计划中</td>
-    <td>2015</td>
-    <td>图像分类</td>
-    <td>待定(ImageNet, CIFAR-10)</td>
-  </tr>
-  <tr>
-    <td><strong>3. Fast R-CNN</strong></td>
-    <td>🚧 计划中</td>
-    <td>2015</td>
-    <td>目标检测</td>
-    <td>待定(PASCAL VOC)</td>
-  </tr>
-  <tr>
-    <td><strong>4. Faster R-CNN</strong></td>
-    <td>🚧 计划中</td>
-    <td>2015</td>
-    <td>目标检测</td>
-    <td>待定(PASCAL VOC, COCO)</td>
-  </tr>
-  <tr>
-    <td><strong>5. Transformer</strong></td>
+    <td><strong>2. Transformer</strong></td>
     <td>✅ 已完成</td>
     <td>2017</td>
     <td>机器翻译</td>
     <td>Multi30k</td>
   </tr>
   <tr>
-    <td><strong>6. Mask R-CNN</strong></td>
-    <td>🚧 计划中</td>
-    <td>2017</td>
-    <td>实例分割</td>
-    <td>待定(COCO)</td>
-  </tr>
-  <tr>
-    <td><strong>7. ViT</strong></td>
+    <td><strong>3. ViT</strong></td>
     <td>🚧 计划中</td>
     <td>2020</td>
     <td>图像分类</td>
     <td>待定</td>
   </tr>
   <tr>
-    <td><strong>8. DETR</strong></td>
+    <td><strong>4. DETR</strong></td>
     <td>⚙️ 进行中</td>
     <td>2020</td>
     <td>端到端目标检测</td>
     <td>待定</td>
   </tr>
   <tr>
-    <td><strong>9. Deformable DETR</strong></td>
-    <td>🚧 计划中</td>
-    <td>2020</td>
-    <td>改进的端到端目标检测</td>
-    <td>待定</td>
-  </tr>
-  <tr>
-    <td><strong>10. CLIP</strong></td>
+    <td><strong>5. CLIP</strong></td>
     <td>✅ 已完成</td>
     <td>2021</td>
     <td>跨模态图像-文本理解</td>
     <td>Flickr30k</td>
   </tr>
   <tr>
-    <td><strong>11. ViLT</strong></td>
-    <td>🚧 计划中</td>
-    <td>2021</td>
-    <td>视觉-语言多模态任务</td>
-    <td>待定</td>
-  </tr>
-  <tr>
-    <td><strong>12. Mask2Former</strong></td>
+    <td><strong>6. Mask2Former</strong></td>
     <td>🚧 计划中</td>
     <td>2021</td>
     <td>统一的图像分割</td>
     <td>待定(COCO, ADE20K, Cityscapes)</td>
   </tr>
   <tr>
-    <td><strong>13. SAM</strong></td>
+    <td><strong>7. SAM</strong></td>
     <td>🚧 计划中</td>
     <td>2023</td>
     <td>通用图像分割</td>
@@ -192,46 +150,7 @@ PyTorch/
   - 提供了模型训练、验证和测试的完整流程
   </details>
 
-### 2. ResNet (2015)
-
-<details>
-<summary>查看详情</summary>
-
-- **实现状态:** 🚧 计划中
-- **发表时间:** 2015 年 12 月
-- **主要功能:** 图像分类
-- **数据集:** 待定(ImageNet, CIFAR-10)
-- **简要说明:** ResNet(残差网络)通过其创新的"快捷连接"(skip connection)结构，允许信息和梯度直接跨越多层传播，从而解决了超深度网络中常见的性能退化和梯度消失问题。这一设计使得训练上百甚至上千层的神经网络成为可能，是计算机视觉领域一个里程碑式的突破。
-- **当前进度:** 正在设计模型架构。
-</details>
-
-### 3. Fast R-CNN (2015)
-
-<details>
-<summary>查看详情</summary>
-
-- **实现状态:** 🚧 计划中
-- **发表时间:** 2015 年 4 月
-- **主要功能:** 目标检测
-- **数据集:** 待定(PASCAL VOC)
-- **简要说明:** Fast R-CNN 通过共享卷积计算和 RoI 池化层的创新设计，显著提升了 R-CNN 的检测速度和准确率。该模型首次实现了端到端的检测器训练，将特征提取、目标分类和边界框回归统一到单一网络中，为后续目标检测模型奠定了重要基础。
-- **当前进度:** 暂无
-</details>
-
-### 4. Faster R-CNN (2015)
-
-<details>
-<summary>查看详情</summary>
-
-- **实现状态:** 🚧 计划中
-- **发表时间:** 2015 年 6 月
-- **主要功能:** 目标检测
-- **数据集:** 待定(PASCAL VOC, COCO)
-- **简要说明:** Faster R-CNN 提出了革命性的区域提议网络(Region Proposal Network, RPN)，首次将候选区域的生成也整合进深度网络中，实现了全端到端的目标检测系统。这一架构不仅大幅提升了检测速度，还显著改善了检测精度，成为后续众多检测和分割模型的基础框架。
-- **当前进度:** 暂无
-</details>
-
-### 5. Transformer (2017)
+### 2. Transformer (2017)
 
 <details>
 <summary>查看详情</summary>
@@ -248,20 +167,7 @@ PyTorch/
   - 实现了基于贪婪解码策略的自回归输出
   </details>
 
-### 6. Mask R-CNN (2017)
-
-<details>
-<summary>查看详情</summary>
-
-- **实现状态:** 🚧 计划中
-- **发表时间:** 2017 年 3 月
-- **主要功能:** 实例分割
-- **数据集:** 待定(COCO)
-- **简要说明:** Mask R-CNN 在经典物体检测框架 Faster R-CNN 的基础上，通过巧妙地增加一个与边界框回归并行的掩码(Mask)预测分支，从而将物体检测和实例分割(Instance Segmentation)这两个任务高效地统一到了一个框架中。该模型引入了 RoIAlign 技术来解决像素对齐问题，实现了对每个物体在像素级别上的精确分割。
-- **当前进度:** 暂无。
-</details>
-
-### 7. ViT (2020)
+### 3. ViT (2020)
 
 <details>
 <summary>查看详情</summary>
@@ -274,7 +180,7 @@ PyTorch/
 - **当前进度:** 使用 Hugging Face Transformers 库实现了完整训练流程
 </details>
 
-### 8. DETR (2020)
+### 4. DETR (2020)
 
 <details>
 <summary>查看详情</summary>
@@ -287,20 +193,7 @@ PyTorch/
 - **当前进度:** 正在设计模型架构和训练流程。
 </details>
 
-### 9. Deformable DETR (2020)
-
-<details>
-<summary>查看详情</summary>
-
-- **实现状态:** 🚧 计划中
-- **发表时间:** 2020 年 11 月
-- **主要功能:** 改进的端到端目标检测
-- **数据集:** 待定
-- **简要说明:** Deformable DETR 通过引入可变形注意力机制和多尺度特征融合，显著提升了 DETR 的收敛速度和性能，尤其在小目标检测方面取得了突出改进。
-- **当前进度:** 暂无
-</details>
-
-### 10. CLIP (2021)
+### 5. CLIP (2021)
 
 <details>
 <summary>查看详情</summary>
@@ -316,20 +209,7 @@ PyTorch/
   - 实现了单个图像 -- 5 个文本的对比损失
   </details>
 
-### 11. ViLT (2021)
-
-<details>
-<summary>查看详情</summary>
-
-- **实现状态:** 🚧 计划中
-- **发表时间:** 2021 年 6 月
-- **主要功能:** 视觉-语言多模态任务
-- **数据集:** 待定
-- **简要说明:** ViLT 是一种轻量级的视觉-语言 Transformer 模型，无需额外的特征提取器，通过高效的端到端训练和图像-文本对齐机制，实现了多种视觉-语言任务的统一处理。
-- **当前进度:** 已有推理脚本框架，正在设计模型架构。
-</details>
-
-### 12. Mask2Former (2021)
+### 6. Mask2Former (2021)
 
 <details>
 <summary>查看详情</summary>
@@ -342,7 +222,7 @@ PyTorch/
 - **当前进度:** 暂无
 </details>
 
-### 13. SAM (2023)
+### 7. SAM (2023)
 
 <details>
 <summary>查看详情</summary>
