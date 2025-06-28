@@ -52,10 +52,8 @@ PyTorch/
 │   ├── VGG/...
 │   ├── Transformer/...
 │   ├── CLIP/...
-│   ├── ViT/...
-│   ├── ViLT/...
 │   ├── DETR/...
-│   └── Deformable_DETR/...
+│   └── SAM/...
 ├── TEST/
 │   ├── test_AutoTokenizer.py
 │   ├── test_dataset.py
@@ -97,35 +95,28 @@ PyTorch/
     <td>Multi30k</td>
   </tr>
   <tr>
-    <td><strong>3. ViT</strong></td>
-    <td>🚧 计划中</td>
-    <td>2020</td>
-    <td>图像分类</td>
-    <td>待定</td>
-  </tr>
-  <tr>
-    <td><strong>4. DETR</strong></td>
+    <td><strong>3. DETR</strong></td>
     <td>⚙️ 进行中</td>
     <td>2020</td>
     <td>端到端目标检测</td>
     <td>待定</td>
   </tr>
   <tr>
-    <td><strong>5. CLIP</strong></td>
+    <td><strong>4. CLIP</strong></td>
     <td>✅ 已完成</td>
     <td>2021</td>
     <td>跨模态图像-文本理解</td>
     <td>Flickr30k</td>
   </tr>
   <tr>
-    <td><strong>6. Mask2Former</strong></td>
+    <td><strong>5. Mask2Former</strong></td>
     <td>🚧 计划中</td>
     <td>2021</td>
     <td>统一的图像分割</td>
     <td>待定(COCO, ADE20K, Cityscapes)</td>
   </tr>
   <tr>
-    <td><strong>7. SAM</strong></td>
+    <td><strong>6. SAM</strong></td>
     <td>🚧 计划中</td>
     <td>2023</td>
     <td>通用图像分割</td>
@@ -167,20 +158,7 @@ PyTorch/
   - 实现了基于贪婪解码策略的自回归输出
   </details>
 
-### 3. ViT (2020)
-
-<details>
-<summary>查看详情</summary>
-
-- **实现状态:** 🚧 计划中
-- **发表时间:** 2020 年 10 月
-- **主要功能:** 图像分类
-- **数据集:** 待定
-- **简要说明:** ViT 将 Transformer 架构应用于图像识别领域，其将图像划分为一系列固定大小的图像块(Patches)，并将这些块的线性嵌入序列输入给 Transformer 编码器进行处理。经过大规模数据集预训练后，这种基于注意力机制的结构在图像分类基准上的性能可以与先进的卷积神经网络（CNN）相媲美。
-- **当前进度:** 使用 Hugging Face Transformers 库实现了完整训练流程
-</details>
-
-### 4. DETR (2020)
+### 3. DETR (2020)
 
 <details>
 <summary>查看详情</summary>
@@ -193,7 +171,7 @@ PyTorch/
 - **当前进度:** 正在设计模型架构和训练流程。
 </details>
 
-### 5. CLIP (2021)
+### 4. CLIP (2021)
 
 <details>
 <summary>查看详情</summary>
@@ -209,7 +187,7 @@ PyTorch/
   - 实现了单个图像 -- 5 个文本的对比损失
   </details>
 
-### 6. Mask2Former (2021)
+### 5. Mask2Former (2021)
 
 <details>
 <summary>查看详情</summary>
@@ -222,7 +200,7 @@ PyTorch/
 - **当前进度:** 暂无
 </details>
 
-### 7. SAM (2023)
+### 6. SAM (2023)
 
 <details>
 <summary>查看详情</summary>
