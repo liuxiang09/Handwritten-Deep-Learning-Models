@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Dict, Tuple
 
-from utils.utils import cxcywh_to_xyxy, generalized_box_iou
-from model.matcher import HungarianMatcher
+from ..utils.utils import cxcywh_to_xyxy, generalized_box_iou
+from .matcher import HungarianMatcher
 
 class SetCriterion(nn.Module):
     """

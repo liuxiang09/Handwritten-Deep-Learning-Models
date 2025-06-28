@@ -3,8 +3,7 @@ import torch
 from torch import nn
 from typing import Optional
 
-# 导入NestedTensor
-from DETR.utils.utils import NestedTensor
+from ..utils.utils import NestedTensor
 
 class PositionEmbeddingSine(nn.Module):
     """

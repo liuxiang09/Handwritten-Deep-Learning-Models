@@ -4,12 +4,10 @@ import torch.nn.functional as F
 import os
 import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from model.backbone import Backbone
-from model.transformer import Transformer
-from model.position_encoding import PositionEmbeddingSine
-from utils.utils import NestedTensor
+from .backbone import Backbone
+from .transformer import Transformer
+from .position_encoding import PositionEmbeddingSine
+from ..utils.utils import NestedTensor
 
 class MLP(nn.Module):
     """简单的多层感知器"""

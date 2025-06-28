@@ -7,9 +7,7 @@ from typing import List, Dict
 from torch import Tensor
 from scipy.optimize import linear_sum_assignment
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from utils.utils import cxcywh_to_xyxy, generalized_box_iou
+from ..utils.utils import cxcywh_to_xyxy, generalized_box_iou
 
 class HungarianMatcher(nn.Module):
     """

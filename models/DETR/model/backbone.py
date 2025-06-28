@@ -5,9 +5,8 @@ import torchvision
 from torchvision.models._utils import IntermediateLayerGetter
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from DETR.utils.utils import NestedTensor
+from ..utils.utils import NestedTensor
 
 class Backbone(nn.Module):
     def __init__(self, name: str = "resnet50", train_backbone: bool = True, return_interm_layers: bool = False, dilation: bool = False):
