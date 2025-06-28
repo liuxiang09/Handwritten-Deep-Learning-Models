@@ -29,11 +29,11 @@ def _get_activation_fn(activation):
         Callable: 对应的激活函数。
     """
     if activation == "relu":
-        return F.relu
+        return nn.ReLU()
     if activation == "gelu":
-        return F.gelu
+        return nn.GELU()
     if activation == "glu":
-        return F.glu
+        return nn.GLU()
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
