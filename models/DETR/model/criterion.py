@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import os
 import sys
 from typing import List, Dict
-from torch import Tensor
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -13,9 +12,7 @@ from model.matcher import HungarianMatcher
 
 class SetCriterion(nn.Module):
     """
-    DETR的损失函数模块。
-    它接收模型的预测和真实标签，通过匈牙利匹配器进行匹配，
-    然后计算最终的损失，包括类别损失、L1边界框损失和GIoU损失。
+    DETR损失函数，计算类别损失、L1边界框损失和GIoU损失。
     """
     def __init__(self, num_classes: int, matcher: HungarianMatcher, weight_dict: Dict, eos_coef: float):
         """
@@ -36,37 +33,42 @@ class SetCriterion(nn.Module):
         # "无目标"类别的权重是eos_coef，其他类别的权重都是1.0
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[-1] = self.eos_coef
-        self.register_buffer('empty_weight', empty_weight)
+        self.register_buffer('empty_weight', empty_weight) # 注册为buffer，这样它就不会被视为模型参数
 
     # --- 单项损失计算函数 ---
 
-    def loss_labels(self, outputs: Dict, targets: List[Dict], indices: List[tuple], num_boxes: int):
-        """计算类别损失 (Classification Loss)"""
+    def _loss_labels(self, outputs: Dict, targets: List[Dict], indices: List[tuple], num_boxes: int):
+        """
+        计算类别损失 (Classification Loss)
+        Args:
+            outputs (Dict): 模型的输出，包含预测的类别 logits，形状为 [B, num_queries, num_classes + 1]
+            targets (List[Dict]): 真实标签列表, 每个字典包含目标框和标签
+            indices (List[tuple]): 匹配结果，包含预测和目标的索引
+            num_boxes (int): Batch中所有目标框的总数，用于归一化损失
+        """
         assert 'pred_logits' in outputs
         src_logits = outputs['pred_logits'] # [B, num_queries, num_classes + 1]
 
-        # `get_src_permutation_idx`将匹配结果转换为可以直接索引的格式
-        idx = self._get_src_permutation_idx(indices)
-        
-        # 创建一个大小为 [B, num_queries] 的目标类别张量
-        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
-        target_classes = torch.full(src_logits.shape[:2], self.num_classes,
-                                    dtype=torch.int64, device=src_logits.device)
-        target_classes[idx] = target_classes_o
+        # 把indices展开为batch索引和预测索引
+        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
+        src_idx = torch.cat([src for (src, _) in indices])
+        # 对每个batch，根据indices的真实类别索引取出真实类别标签
+        target_classes_o = torch.cat([target["labels"][J] for target, (_, J) in zip(targets, indices)]) # [B, num_matched_boxes]
+        target_classes = torch.full(src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device)
+        target_classes[batch_idx, src_idx] = target_classes_o
 
         # 计算交叉熵损失，使用前面定义的`empty_weight`来平衡正负样本
         loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
-        losses = {'loss_ce': loss_ce}
-        return losses
+        return {'loss_ce': loss_ce}
 
-    def loss_boxes(self, outputs: Dict, targets: List[Dict], indices: List[tuple], num_boxes: int):
+    def _loss_boxes(self, outputs: Dict, targets: List[Dict], indices: List[tuple], num_boxes: int):
         """计算边界框损失 (Bounding Box Loss)，包含L1损失和GIoU损失"""
         assert 'pred_boxes' in outputs
-        idx = self._get_src_permutation_idx(indices)
-        
-        # 只对匹配上的预测框计算损失
-        src_boxes = outputs['pred_boxes'][idx] # [num_matched_boxes, 4]
-        target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        # 直接展开索引逻辑
+        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
+        src_idx = torch.cat([src for (src, _) in indices])
+        src_boxes = outputs['pred_boxes'][batch_idx, src_idx] # [num_matched_boxes, 4]
+        target_boxes = torch.cat([target['boxes'][i] for target, (_, i) in zip(targets, indices)], dim=0)
 
         # L1 损失
         loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction='none')
@@ -77,29 +79,9 @@ class SetCriterion(nn.Module):
             cxcywh_to_xyxy(target_boxes)
         ))
 
-        losses = {}
-        losses['loss_bbox'] = loss_bbox.sum() / num_boxes
-        losses['loss_giou'] = loss_giou.sum() / num_boxes
-        return losses
+        return {'loss_bbox': loss_bbox.sum() / num_boxes, 'loss_giou': loss_giou.sum() / num_boxes}
     
-    # --- 辅助函数 ---
-    
-    def _get_src_permutation_idx(self, indices: List[tuple]) -> tuple:
-        # 将匹配结果(indices)转换成可以直接用于索引的格式
-        # e.g., for batch_size=2, indices = [(tensor([0, 1]), tensor([1, 0])), (tensor([0]), tensor([0]))]
-        # batch_idx = [0, 0, 1]
-        # src_idx = [0, 1, 0]
-        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
-        src_idx = torch.cat([src for (src, _) in indices])
-        return batch_idx, src_idx
-
-    def _get_tgt_permutation_idx(self, indices: List[tuple]) -> tuple:
-        # 同上，但是是为target准备的
-        batch_idx = torch.cat([torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)])
-        tgt_idx = torch.cat([tgt for (_, tgt) in indices])
-        return batch_idx, tgt_idx
-
-    # --- 主前向传播函数 ---
+    # --- 前向传播 ---
 
     def forward(self, outputs: Dict, targets: List[Dict]):
         """
@@ -123,9 +105,9 @@ class SetCriterion(nn.Module):
         # 3. 计算各项损失
         losses = {}
         # -- 类别损失 --
-        losses.update(self.loss_labels(outputs, targets, indices, num_boxes))
+        losses.update(self._loss_labels(outputs, targets, indices, num_boxes))
         # -- 边界框损失 --
-        losses.update(self.loss_boxes(outputs, targets, indices, num_boxes))
+        losses.update(self._loss_boxes(outputs, targets, indices, num_boxes))
 
         # 4. 计算辅助损失 (如果存在)
         if 'aux_outputs' in outputs:
@@ -134,9 +116,9 @@ class SetCriterion(nn.Module):
                 indices_aux = self.matcher(aux_outputs, targets)
                 
                 # 计算类别损失
-                l_dict = self.loss_labels(aux_outputs, targets, indices_aux, num_boxes)
+                l_dict = self._loss_labels(aux_outputs, targets, indices_aux, num_boxes)
                 # 计算边界框损失
-                l_dict.update(self.loss_boxes(aux_outputs, targets, indices_aux, num_boxes))
+                l_dict.update(self._loss_boxes(aux_outputs, targets, indices_aux, num_boxes))
                 
                 # 将辅助损失的键名加上后缀
                 l_dict = {k + f'_{i}': v for k, v in l_dict.items()}

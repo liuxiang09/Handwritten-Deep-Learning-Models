@@ -9,12 +9,25 @@ import copy
 # ==============================================================================
 
 def _get_clones(module, N):
-    """创建N个相同的模块副本"""
+    """
+    创建N个相同的模块副本。
+    Args:
+        module (nn.Module): 需要复制的模块。
+        N (int): 副本数量。
+    Returns:
+        nn.ModuleList: 包含N个深拷贝模块的ModuleList。
+    """
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
 
 
 def _get_activation_fn(activation):
-    """根据字符串返回对应的激活函数"""
+    """
+    根据字符串返回对应的激活函数。
+    Args:
+        activation (str): 激活函数名称（'relu', 'gelu', 'glu'）。
+    Returns:
+        Callable: 对应的激活函数。
+    """
     if activation == "relu":
         return F.relu
     if activation == "gelu":
@@ -32,8 +45,14 @@ class EncoderLayer(nn.Module):
     """
     Transformer Encoder的基础层。
     包含：自注意力 (Self-Attention) -> Add&Norm -> 前馈网络 (FFN) -> Add&Norm
+    Args:
+        d_model (int): 特征维度。
+        nhead (int): 多头注意力头数。
+        dim_feedforward (int): 前馈网络隐藏层维度。
+        dropout (float): dropout概率。
+        activation (str): 激活函数类型。
     """
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
+    def __init__(self, d_model: int, nhead: int, dim_feedforward: int = 2048, dropout: float = 0.1, activation: str = "relu"):
         super().__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         
@@ -51,7 +70,9 @@ class EncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
 
     def add_pos_encoding(self, tensor: torch.Tensor, pos: torch.Tensor):
-        """将位置编码添加到输入张量中。"""
+        """
+        将位置编码添加到输入张量中。
+        """
         return tensor + pos
 
     def forward(self,
@@ -59,6 +80,16 @@ class EncoderLayer(nn.Module):
                 pos: torch.Tensor,
                 src_mask: Optional[torch.Tensor] = None,
                 src_key_padding_mask: Optional[torch.Tensor] = None):
+        """
+        前向传播。
+        Args:
+            src (Tensor): 输入特征。[H*W, B, C]
+            pos (Tensor): 位置编码。[H*W, B, C]
+            src_mask (Tensor, optional): 注意力mask。
+            src_key_padding_mask (Tensor, optional): padding mask。
+        Returns:
+            Tensor: 输出特征。[H*W, B, C]
+        """
         # 在输入给自注意力前加上位置编码
         q = k = self.add_pos_encoding(src, pos)
         # 自注意力
@@ -82,13 +113,14 @@ class DecoderLayer(nn.Module):
     """
     Transformer Decoder的基础层。
     包含：自注意力 -> Add&Norm -> 交叉注意力 -> Add&Norm -> 前馈网络 -> Add&Norm
+    Args:
+        d_model (int): 特征维度。
+        nhead (int): 多头注意力头数。
+        dim_feedforward (int): 前馈网络隐藏层维度。
+        dropout (float): dropout概率。
+        activation (str): 激活函数类型。
     """
-    def __init__(self, 
-                 d_model: int, 
-                 nhead: int, 
-                 dim_feedforward: int = 2048, 
-                 dropout: float = 0.1,
-                 activation: str = "relu"):
+    def __init__(self, d_model: int, nhead: int, dim_feedforward: int = 2048, dropout: float = 0.1, activation: str = "relu"):
         super().__init__()
         # Decoder的自注意力，关注对象是Object Queries
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
@@ -111,7 +143,9 @@ class DecoderLayer(nn.Module):
         self.dropout3 = nn.Dropout(dropout)
 
     def add_pos_encoding(self, tensor: torch.Tensor, pos: torch.Tensor):
-        """将位置编码添加到输入张量中。"""
+        """
+        将位置编码添加到输入张量中。
+        """
         return tensor + pos
 
     def forward(self, 
@@ -123,6 +157,17 @@ class DecoderLayer(nn.Module):
                 memory_mask: Optional[torch.Tensor] = None,
                 tgt_key_padding_mask: Optional[torch.Tensor] = None,
                 memory_key_padding_mask: Optional[torch.Tensor] = None):
+        """
+        前向传播。
+        Args:
+            tgt (Tensor): Decoder输入。[num_queries, B, C]
+            memory (Tensor): Encoder输出。[H*W, B, C]
+            query_pos (Tensor): Object Queries的位置编码。[num_queries, B, C]
+            pos (Tensor): 图像特征的位置编码。[H*W, B, C]
+            tgt_mask, memory_mask, tgt_key_padding_mask, memory_key_padding_mask: mask参数。
+        Returns:
+            Tensor: Decoder输出。[num_queries, B, C]
+        """
         # 1. Decoder自注意力 (Q, K, V都是Object Queries)
         # 在输入给注意力层之前，给Q和K加上Object Queries的位置编码(query_pos)
         q = k = self.add_pos_encoding(tgt, query_pos)
@@ -161,6 +206,10 @@ class DecoderLayer(nn.Module):
 class Encoder(nn.Module):
     """
     由多个EncoderLayer堆叠而成的完整Encoder。
+    Args:
+        encoder_layer (EncoderLayer): 单层Encoder。
+        num_layers (int): 层数。
+        norm (nn.Module, optional): 层归一化。
     """
     def __init__(self, encoder_layer: EncoderLayer, num_layers: int, norm: Optional[nn.Module] = None):
         super().__init__()
@@ -173,7 +222,16 @@ class Encoder(nn.Module):
                 pos: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
                 src_key_padding_mask: Optional[torch.Tensor] = None):
-        
+        """
+        前向传播。
+        Args:
+            src (Tensor): 输入特征。[H*W, B, C]
+            pos (Tensor): 位置编码。[H*W, B, C]
+            mask (Tensor, optional): 注意力mask。
+            src_key_padding_mask (Tensor, optional): padding mask。
+        Returns:
+            Tensor: 输出特征。[H*W, B, C]
+        """
         output = src
         # 多层EncoderLayer堆叠
         for layer in self.layers:
@@ -191,6 +249,11 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     """
     由多个DecoderLayer堆叠而成的完整Decoder。
+    Args:
+        decoder_layer (DecoderLayer): 单层Decoder。
+        num_layers (int): 层数。
+        norm (nn.Module, optional): 层归一化。
+        return_intermediate_dec (bool): 是否返回所有中间层输出。
     """
     def __init__(self, 
                  decoder_layer: DecoderLayer, 
@@ -212,6 +275,17 @@ class Decoder(nn.Module):
                 memory_mask: Optional[torch.Tensor] = None,
                 tgt_key_padding_mask: Optional[torch.Tensor] = None,
                 memory_key_padding_mask: Optional[torch.Tensor] = None):
+        """
+        前向传播。
+        Args:
+            tgt (Tensor): Decoder输入。[num_queries, B, C]
+            memory (Tensor): Encoder输出。[H*W, B, C]
+            query_pos (Tensor): Object Queries的位置编码。[num_queries, B, C]
+            pos (Tensor): 图像特征的位置编码。[H*W, B, C]
+            tgt_mask, memory_mask, tgt_key_padding_mask, memory_key_padding_mask: mask参数。
+        Returns:
+            Tensor: Decoder输出。[num_layers, B, num_queries, C] 或 [1, B, num_queries, C]
+        """
         output = tgt
         intermediate = []
 
@@ -251,6 +325,15 @@ class Decoder(nn.Module):
 class Transformer(nn.Module):
     """
     DETR中完整的Transformer模块，整合了Encoder和Decoder。
+    Args:
+        d_model (int): 特征维度。
+        nhead (int): 多头注意力头数。
+        num_encoder_layers (int): Encoder层数。
+        num_decoder_layers (int): Decoder层数。
+        dim_feedforward (int): 前馈网络隐藏层维度。
+        dropout (float): dropout概率。
+        activation (str): 激活函数类型。
+        return_intermediate_dec (bool): 是否返回所有Decoder中间层输出。
     """
     def __init__(self, 
                  d_model: int = 256, # 原始论文就是d_model=256
@@ -278,6 +361,9 @@ class Transformer(nn.Module):
         self.nhead = nhead
 
     def _reset_parameters(self):
+        """
+        初始化所有参数。
+        """
         for p in self.parameters():
             # dim>1 说明不是bias
             if p.dim() > 1:
@@ -285,15 +371,15 @@ class Transformer(nn.Module):
 
     def forward(self, src: torch.Tensor, mask: torch.Tensor, query_embed: torch.Tensor, pos_embed: torch.Tensor):
         """
+        Transformer前向传播。
         Args:
             src (Tensor): Backbone的输出特征. [B, C, H, W]
             mask (Tensor): 用于区分padding的mask. [B, H, W]
             query_embed (Tensor): Object Queries, 可学习的查询向量. [num_queries, C]
             pos_embed (Tensor): 位置编码. [B, C, H, W]
-
         Returns:
             hs (Tensor): Decoder各层输出的集合. [num_layers, B, num_queries, C]
-            memory (Tensor): Encoder最后一层的输出. [H*W, B, C]
+            memory (Tensor): Encoder最后一层的输出. [B, C, H, W]
         """
         # --- 数据预处理 ---
         # 将输入特征图和位置编码从 [B, C, H, W] 展平为 [H*W, B, C]
@@ -331,7 +417,13 @@ class Transformer(nn.Module):
 # ==============================================================================
 
 def build_transformer(args):
-    """根据参数构建Transformer模型"""
+    """
+    根据参数构建Transformer模型。
+    Args:
+        args: 包含Transformer相关参数的对象。
+    Returns:
+        Transformer: 构建好的Transformer实例。
+    """
     return Transformer(
         d_model=args.transformer_dim,
         dropout=args.dropout,

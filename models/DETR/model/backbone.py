@@ -19,6 +19,10 @@ class Backbone(nn.Module):
             dilation: 是否使用dilation卷积
         """
         super().__init__()
+        # 记录输出通道数和步长
+        self.num_channels = 2048  # C = 2048
+        self.strides = [32]
+
         # 使用torchvision.models的模型作为backbone
         backbone_fn = getattr(torchvision.models, name)
         
@@ -27,27 +31,10 @@ class Backbone(nn.Module):
             replace_stride_with_dilation=[False, False, dilation],  # 对应layer2,3,4
             norm_layer=nn.BatchNorm2d
         )
-        # 官方简洁写法，可读性不咋地
+        # 官方简洁写法，表示若训练backbone，则只训练layer2, layer3, layer4的参数
         for name, parameter in self.body.named_parameters():
             if not train_backbone or ('layer2' not in name and 'layer3' not in name and 'layer4' not in name):
                 parameter.requires_grad_(False)
-                
-        # # 较为复杂写法，可读性较好
-        # if not train_backbone:
-        #     # 如果不训练backbone，冻结所有参数
-        #     for parameter in self.body.parameters():
-        #         parameter.requires_grad_(False)
-        # else:
-        #     # 如果训练backbone，只训练layer2, layer3, layer4部分
-        #     for layer_name, parameter in self.body.named_parameters():
-        #         # 默认冻结所有参数
-        #         parameter.requires_grad_(False)
-        #         # 只有layer2, layer3, layer4的参数参与训练
-        #         if any(layer in layer_name for layer in ['layer2', 'layer3', 'layer4']):
-        #             parameter.requires_grad_(True)
-                
-        # 是否返回中间层的特征
-        self.return_interm_layers = return_interm_layers
         
         # 为FPN设计，但是暂未使用，return_interm_layers=False
         if return_interm_layers:
@@ -63,9 +50,6 @@ class Backbone(nn.Module):
             
         self.body = IntermediateLayerGetter(self.body, return_layers=return_layers)
         
-        # 记录输出通道数和步长
-        self.num_channels = 2048  # C = 2048
-        self.strides = [32]
         
     def forward(self, x: NestedTensor):
         """
@@ -91,8 +75,7 @@ class Backbone(nn.Module):
             _, _, h, w = feature.shape
             
             if x.mask is not None:
-                # 下采样mask到特征图的尺寸
-                # 使用最近邻插值以保持二值性质
+                # 下采样mask到特征图的尺寸，使用最近邻插值以保持二值性质
                 mask = F.interpolate(x.mask[None].float(), size=(h, w), mode="nearest")[0].to(torch.bool)
             else:
                 # 如果没有mask，创建一个全为False的mask

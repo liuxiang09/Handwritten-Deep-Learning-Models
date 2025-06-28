@@ -9,7 +9,7 @@ from scipy.optimize import linear_sum_assignment
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.utils import box_cxcywh_to_xyxy, generalized_box_iou
+from utils.utils import cxcywh_to_xyxy, generalized_box_iou
 
 class HungarianMatcher(nn.Module):
     """
@@ -48,18 +48,18 @@ class HungarianMatcher(nn.Module):
         """
         bs, num_queries = outputs["pred_logits"].shape[:2]
 
-        # 1. 计算代价矩阵 (Cost Matrix)
-        # 代价矩阵的形状是 [B, num_queries, num_target_boxes]
-        # 首先，将模型输出和目标在batch维度上进行拼接，方便计算
+        # 1. 计算代价矩阵 (Cost Matrix) --> [B, num_queries, num_target_boxes]
+
+        # 将预测结果展平，方便后续计算
         out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  # [B * num_queries, num_classes + 1]
         out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [B * num_queries, 4]
 
-        # 将所有target的类别和box拼接起来
+        # 将target列表的所有labels和boxes拼接起来
         tgt_ids = torch.cat([v["labels"] for v in targets]) # [total_num_boxes]
         tgt_bbox = torch.cat([v["boxes"] for v in targets]) # [total_num_boxes, 4]
 
         # 计算类别代价 (Classification Cost)
-        # 代价为 "不是" 目标类别的概率，所以用 1 - P(class)，或者直接用 -P(class) 作为cost，效果一样
+        # out_prob[:, tgt_ids]可以得到每个查询对应的真实类别的概率,为了适配匈牙利算法，使用-号将概率转换为"代价"
         cost_class = -out_prob[:, tgt_ids]
 
         # 计算L1 BBox代价 (L1 BBox Cost)
@@ -67,14 +67,16 @@ class HungarianMatcher(nn.Module):
         cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1) # [B * num_queries, total_num_boxes]
 
         # 计算GIoU BBox代价 (GIoU BBox Cost)
-        cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox)) # [B * num_queries, total_num_boxes]
-        
+        cost_giou = -generalized_box_iou(cxcywh_to_xyxy(out_bbox), cxcywh_to_xyxy(tgt_bbox)) # [B * num_queries, total_num_boxes]
+
         # 最终代价是三者的加权和
         C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou # [B * num_queries, total_num_boxes]
         C = C.view(bs, num_queries, -1).cpu() # [B, num_queries, total_num_boxes]
 
         # 2. 匈牙利算法求解最优匹配
         sizes = [len(v["boxes"]) for v in targets] # 每个batch中目标框的数量
+
+        # linear_sum_assignment的输入必须是[num_queries, total_num_boxes]
         indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
         
         # 3. 整理返回结果

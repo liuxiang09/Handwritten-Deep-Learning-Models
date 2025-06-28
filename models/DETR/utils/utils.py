@@ -69,6 +69,11 @@ def box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
 def generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     """
     计算两个box的Generalized IoU(广义交并比)。
+    Args:
+        boxes1: 形状为(N, 4)的tensor，表示N个box。
+        boxes2: 形状为(M, 4)的tensor，表示M个box。
+    Returns:
+        GIoU: 形状为(N, M)的tensor，表示N个box和M个box的广义IoU。
     """
     # 确保boxes1和boxes2都不为空
     assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
