@@ -8,15 +8,7 @@ from .matcher import HungarianMatcher
 
 class SetCriterion(nn.Module):
     """
-    DETR损失函数类。
-
-    该类通过匈牙利匹配器将模型的预测结果与真实标签进行一对一匹配，
-    然后计算三项损失：
-    1. 类别损失 (Classification Loss): 使用交叉熵，惩罚错误的类别预测。
-       对于未匹配的预测，其目标是 "无目标" (no object) 类别。
-    2. L1 边界框损失 (L1 Box Loss): 惩罚匹配上的预测框与真实框之间的 L1 距离。
-    3. GIoU 边界框损失 (Generalized IoU Loss): 惩罚匹配上的预测框与真实框之间的 GIoU 距离，
-       它对框的尺度不敏感，且能更好地处理框不重叠的情况。
+    DETR损失函数类，包括类别损失、边界框回归损失和GIoU损失。
     """
     def __init__(self, num_classes: int, matcher: HungarianMatcher, weight_dict: Dict, eos_coef: float):
         """
@@ -160,7 +152,7 @@ class SetCriterion(nn.Module):
         # 3. 计算最后一层的损失
         losses = self.calculate_losses(outputs, targets, indices, num_boxes)
 
-        # 4. 如果存在辅助输出 (来自解码器的中间层)，则为它们计算辅助损失
+        # 4. 计算辅助损失
         if 'aux_outputs' in outputs:
             for i, aux_outputs in enumerate(outputs['aux_outputs']):
                 # 每一层都需要独立的匹配

@@ -1,11 +1,4 @@
-import sys
-import os
 import torch
-
-# 添加项目根目录到路径，以便导入模块
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.append(project_root)
-
 from models.DETR.model.detr import DETR, MLP
 from models.DETR.model.backbone import Backbone
 from models.DETR.model.transformer import Transformer
@@ -31,16 +24,16 @@ NUM_DECODER_LAYERS = 6
 DIM_FEEDFORWARD = 2048
 
 # DETR参数
-NUM_CLASSES = 91
+NUM_CLASSES = 90  # 只用90类，不加背景
 NUM_QUERIES = 100
 RETURN_INTERMEDIATE_DEC = False
 
 # 测试数据参数
-BATCH_SIZE_MLP = 8
+BATCH_SIZE_MLP = 32
 SEQ_LEN = 100
-BATCH_SIZE_DETR = 2
-IMAGE_HEIGHT = 800
-IMAGE_WIDTH = 1200
+BATCH_SIZE_DETR = 32
+IMAGE_HEIGHT = 80
+IMAGE_WIDTH = 100
 NUM_CHANNELS = 3
 
 
@@ -120,7 +113,7 @@ def test_detr():
     assert len(boxes_shape) == 3, f"boxes应该是3维张量，实际得到 {len(boxes_shape)} 维"
     
     # 验证最后一维的大小
-    assert logits_shape[-1] == NUM_CLASSES + 1, f"logits最后一维应该是{NUM_CLASSES + 1} ({NUM_CLASSES}类+1背景)，实际得到 {logits_shape[-1]}"
+    assert logits_shape[-1] == NUM_CLASSES + 1, f"logits最后一维应该是{NUM_CLASSES + 1} (含背景)，实际得到 {logits_shape[-1]}"
     assert boxes_shape[-1] == 4, f"boxes最后一维应该是4，实际得到 {boxes_shape[-1]}"
     
     # 验证包含正确的批次大小和查询数量

@@ -19,14 +19,14 @@ class PositionEmbeddingSine(nn.Module):
             scale = 2 * math.pi
         self.scale = scale
         
-    def forward(self, tensor: NestedTensor):
+    def forward(self, x: NestedTensor):
         """
         Args:
-            tensor: NestedTensor对象，包含'tensor'和'mask'属性
+            x: NestedTensor对象，包含'tensor'和'mask'属性
         Returns:
             pos: [B, hidden_dim, H, W] 位置编码
         """
-        mask = tensor.mask  # [B, H, W]，True表示padding
+        mask = x.mask  # [B, H, W]，True表示padding
         not_mask = ~mask  # 反转mask，False表示padding位置
         y_embed = not_mask.cumsum(1, dtype=torch.float32)  # 累加得到y坐标
         x_embed = not_mask.cumsum(2, dtype=torch.float32)  # 累加得到x坐标
@@ -70,20 +70,21 @@ class PositionEmbeddingLearned(nn.Module):
         nn.init.uniform_(self.row_embed.weight)
         nn.init.uniform_(self.col_embed.weight)
 
-    def forward(self, mask):
-        h, w = mask.shape[-2:]
-        i = torch.arange(w, device=mask.device) # 列索引: [0, 1, ..., w-1]
-        j = torch.arange(h, device=mask.device) # 行索引: [0, 1, ..., h-1]
-        
+    def forward(self, x: NestedTensor) -> torch.Tensor:
+        assert len(x.mask.shape) == 3, "输入的 NestedTensor 必须有3个维度 [B, H, W]"
+        h, w = x.mask.shape[1:]
+        i = torch.arange(w, device=x.mask.device) # 列索引: [0, 1, ..., w-1]
+        j = torch.arange(h, device=x.mask.device) # 行索引: [0, 1, ..., h-1]
+
         # 从查询表中查找每个行/列索引对应的向量
-        x_emb = self.col_embed(i)  # [W, C]
-        y_emb = self.row_embed(j)  # [H, C]
-        
-        # 将行、列向量组合成一个 [H, W, 2*C] 的位置图，然后调整维度
+        x_emb = self.col_embed(i)  # [W, num_pos_feats]
+        y_emb = self.row_embed(j)  # [H, num_pos_feats]
+
+        # 将行、列向量组合成一个 [H, W, 2*num_pos_feats] 的位置图，然后调整维度并重复以适应批次大小
         pos = torch.cat([
-            x_emb.unsqueeze(0).repeat(h, 1, 1), # [H, W, C]
-            y_emb.unsqueeze(1).repeat(1, w, 1), # [H, W, C]
-        ], dim=-1).permute(2, 0, 1).unsqueeze(0).repeat(mask.shape[0], 1, 1, 1)
+            x_emb.unsqueeze(0).repeat(h, 1, 1), # [H, W, num_pos_feats]
+            y_emb.unsqueeze(1).repeat(1, w, 1), # [H, W, num_pos_feats]
+        ], dim=-1).permute(2, 0, 1).unsqueeze(0).repeat(x.mask.shape[0], 1, 1, 1)
 
         return pos
 

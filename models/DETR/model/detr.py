@@ -49,7 +49,7 @@ class DETR(nn.Module):
         self.bbox_head = MLP(hidden_dim, hidden_dim, 4, 3)  # 预测归一化的边界框坐标(cx,cy,w,h)
         
         # 可学习的对象查询
-        self.query_embed = nn.Embedding(num_queries, hidden_dim)
+        self.query_embed = nn.Embedding(num_queries, hidden_dim) # [100, hidden_dim]
         
         # 特征投影和位置编码
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=1)
@@ -80,17 +80,17 @@ class DETR(nn.Module):
         pos_embed = self.pos_encoding(src)  # [B, hidden_dim, H/32, W/32]
         
         # 3. Transformer处理
-        # proj_src: [B, hidden_dim, H/32, W/32]
+        # src: [B, hidden_dim, H/32, W/32]
         # mask: [B, H/32, W/32]
         # query_embed: [num_queries, hidden_dim]
         # pos_embed: [B, hidden_dim, H/32, W/32]
-        hs, _ = self.transformer(self.input_proj(src.tensors), src.mask, self.query_embed.weight, pos_embed)
-        # hs: [num_decoder_layers, B, num_queries, hidden_dim]
+        hs, _ = self.transformer(src=self.input_proj(src.tensors), mask=src.mask, query_embed=self.query_embed.weight, pos_embed=pos_embed)
+        # hs: [num_decoder_layers 或 1, B, num_queries, hidden_dim]
         
         # 4. 预测头输出
-        outputs_class = self.class_head(hs)  # [num_layers, B, num_queries, num_classes+1]
-        outputs_coord = self.bbox_head(hs).sigmoid()  # [num_layers, B, num_queries, 4]
-        
+        outputs_class = self.class_head(hs)  # [num_decoder_layers, B, num_queries, num_classes+1]
+        outputs_coord = self.bbox_head(hs).sigmoid()  # [num_decoder_layers, B, num_queries, 4]
+
         # 5. 只取最后一层输出
         out = {
             'pred_logits': outputs_class[-1],  # [B, num_queries, num_classes+1]

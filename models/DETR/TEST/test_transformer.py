@@ -1,11 +1,4 @@
-import sys
-import os
 import torch
-
-# 添加项目根目录到路径，以便导入模块
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.append(project_root)
-
 from models.DETR.model.transformer import Transformer
 
 # 全局参数配置
@@ -15,12 +8,12 @@ NHEAD = 8
 NUM_ENCODER_LAYERS = 6
 NUM_DECODER_LAYERS = 6
 DIM_FEEDFORWARD = 2048
-RETURN_INTERMEDIATE_DEC = False
+RETURN_INTERMEDIATE_DEC = True
 
 # 测试数据参数
-BATCH_SIZE = 2
-HEIGHT = 30
-WIDTH = 40
+BATCH_SIZE = 32
+HEIGHT = 7
+WIDTH = 7
 TGT_LEN = 100
 
 
@@ -51,7 +44,7 @@ def test_transformer():
     query_embed = torch.rand(TGT_LEN, D_MODEL)
     pos_embed = torch.rand(BATCH_SIZE, D_MODEL, HEIGHT, WIDTH)
     
-    print(f"源张量形状: {src.shape}")
+    print(f"\n源张量形状: {src.shape}")
     print(f"查询嵌入形状: {query_embed.shape}")
     print(f"位置嵌入形状: {pos_embed.shape}")
     print(f"掩码形状: {mask.shape}")
@@ -60,7 +53,7 @@ def test_transformer():
     with torch.no_grad():  # 节省内存
         hs, memory = transformer(src, mask, query_embed, pos_embed)
     
-    print(f"解码器输出形状: {hs.shape}")
+    print(f"\n解码器输出形状: {hs.shape}")
     print(f"编码器输出形状: {memory.shape}")
     
     # 验证输出维度合理性

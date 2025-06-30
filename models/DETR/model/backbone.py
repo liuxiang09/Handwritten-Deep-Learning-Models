@@ -9,7 +9,11 @@ import os
 from ..utils.utils import NestedTensor
 
 class Backbone(nn.Module):
-    def __init__(self, name: str = "resnet50", train_backbone: bool = True, return_interm_layers: bool = False, dilation: bool = False):
+    def __init__(self,
+                 name: str = "resnet50", 
+                 train_backbone: bool = True, 
+                 return_interm_layers: bool = False, 
+                 dilation: bool = False):
         """
         Args:
             name: 使用的backbone模型，如"resnet50"
@@ -30,7 +34,7 @@ class Backbone(nn.Module):
             replace_stride_with_dilation=[False, False, dilation],  # 对应layer2,3,4
             norm_layer=nn.BatchNorm2d
         )
-        # 官方简洁写法，表示若训练backbone，则只训练layer2, layer3, layer4的参数
+        # 只训练layer2, layer3, layer4的参数
         for name, parameter in self.body.named_parameters():
             if not train_backbone or ('layer2' not in name and 'layer3' not in name and 'layer4' not in name):
                 parameter.requires_grad_(False)
@@ -50,7 +54,7 @@ class Backbone(nn.Module):
         self.body = IntermediateLayerGetter(self.body, return_layers=return_layers)
         
         
-    def forward(self, x: NestedTensor):
+    def forward(self, x: NestedTensor) -> dict[str, NestedTensor]:
         """
         Args:
             x: NestedTensor包含:
@@ -60,12 +64,12 @@ class Backbone(nn.Module):
         Returns:
             out: 包含多个特征层的NestedTensor字典
                - 键为特征层名称，值为NestedTensor对象，包含:
-                 - tensors: [B, C, H/32, W/32] - 特征图
+                 - tensors: [B, 2048, H/32, W/32] - 特征图
                  - mask: [B, H/32, W/32] - 填充掩码
         """
         # 处理图像特征
         tensors = x.tensors
-        features = self.body(tensors) # [B, C, H, W]
+        features = self.body(tensors) # 最后一层输出 -> [B, 2048, H/32, W/32]
         
         # 处理mask
         out = {}

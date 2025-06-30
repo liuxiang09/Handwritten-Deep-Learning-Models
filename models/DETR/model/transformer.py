@@ -83,12 +83,12 @@ class EncoderLayer(nn.Module):
         """
         前向传播。
         Args:
-            src (Tensor): 输入特征。[H*W, B, C]
-            pos (Tensor): 位置编码。[H*W, B, C]
+            src (Tensor): 输入特征。[H*W, B, D]
+            pos (Tensor): 位置编码。[H*W, B, D]
             src_mask (Tensor, optional): 注意力mask。
             src_key_padding_mask (Tensor, optional): padding mask。
         Returns:
-            Tensor: 输出特征。[H*W, B, C]
+            Tensor: 输出特征。[H*W, B, D]
         """
         # 在输入给自注意力前加上位置编码
         q = k = self.add_pos_encoding(src, pos)
@@ -160,13 +160,13 @@ class DecoderLayer(nn.Module):
         """
         前向传播。
         Args:
-            tgt (Tensor): Decoder输入。[num_queries, B, C]
-            memory (Tensor): Encoder输出。[H*W, B, C]
-            query_pos (Tensor): Object Queries的位置编码。[num_queries, B, C]
-            pos (Tensor): 图像特征的位置编码。[H*W, B, C]
+            tgt (Tensor): Decoder输入。[num_queries, B, D]
+            memory (Tensor): Encoder输出。[H*W, B, D]
+            query_pos (Tensor): Object Queries的位置编码。[num_queries, B, D]
+            pos (Tensor): 图像特征的位置编码。[H*W, B, D]
             tgt_mask, memory_mask, tgt_key_padding_mask, memory_key_padding_mask: mask参数。
         Returns:
-            Tensor: Decoder输出。[num_queries, B, C]
+            Tensor: Decoder输出。[num_queries, B, D]
         """
         # 1. Decoder自注意力 (Q, K, V都是Object Queries)
         # 在输入给注意力层之前，给Q和K加上Object Queries的位置编码(query_pos)
@@ -187,7 +187,7 @@ class DecoderLayer(nn.Module):
                                    key=self.add_pos_encoding(memory, pos),
                                    value=memory, 
                                    attn_mask=memory_mask,
-                                   key_padding_mask=memory_key_padding_mask)[0]
+                                   key_padding_mask=memory_key_padding_mask)[0] # [num_queries, B, D]
         # Add & Norm
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
@@ -211,7 +211,10 @@ class Encoder(nn.Module):
         num_layers (int): 层数。
         norm (nn.Module, optional): 层归一化。
     """
-    def __init__(self, encoder_layer: EncoderLayer, num_layers: int, norm: Optional[nn.Module] = None):
+    def __init__(self, 
+                 encoder_layer: EncoderLayer, 
+                 num_layers: int, 
+                 norm: Optional[nn.Module] = None):
         super().__init__()
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
@@ -225,12 +228,12 @@ class Encoder(nn.Module):
         """
         前向传播。
         Args:
-            src (Tensor): 输入特征。[H*W, B, C]
-            pos (Tensor): 位置编码。[H*W, B, C]
+            src (Tensor): 输入特征。[H*W, B, D]
+            pos (Tensor): 位置编码。[H*W, B, D]
             mask (Tensor, optional): 注意力mask。
             src_key_padding_mask (Tensor, optional): padding mask。
         Returns:
-            Tensor: 输出特征。[H*W, B, C]
+            Tensor: 输出特征。[H*W, B, D]
         """
         output = src
         # 多层EncoderLayer堆叠
@@ -243,7 +246,7 @@ class Encoder(nn.Module):
         if self.norm is not None:
             output = self.norm(output)
 
-        return output # [H*W, B, C]
+        return output # [H*W, B, D]
 
 
 class Decoder(nn.Module):
@@ -257,7 +260,8 @@ class Decoder(nn.Module):
     """
     def __init__(self, 
                  decoder_layer: DecoderLayer, 
-                 num_layers: int, norm: Optional[nn.Module] = None, 
+                 num_layers: int, 
+                 norm: Optional[nn.Module] = None, 
                  return_intermediate_dec: bool = False):
         
         super().__init__()
@@ -278,19 +282,19 @@ class Decoder(nn.Module):
         """
         前向传播。
         Args:
-            tgt (Tensor): Decoder输入。[num_queries, B, C]
-            memory (Tensor): Encoder输出。[H*W, B, C]
-            query_pos (Tensor): Object Queries的位置编码。[num_queries, B, C]
-            pos (Tensor): 图像特征的位置编码。[H*W, B, C]
+            tgt (Tensor): Decoder输入。[num_queries, B, D]
+            memory (Tensor): Encoder输出。[H*W, B, D]
+            query_pos (Tensor): Object Queries的位置编码。[num_queries, B, D]
+            pos (Tensor): 图像特征的位置编码。[H*W, B, D]
             tgt_mask, memory_mask, tgt_key_padding_mask, memory_key_padding_mask: mask参数。
         Returns:
-            Tensor: Decoder输出。[num_layers, B, num_queries, C] 或 [1, B, num_queries, C]
+            Tensor: Decoder输出。[num_layers, B, num_queries, D] 或 [1, B, num_queries, D]
         """
         output = tgt
         intermediate = []
 
         for layer in self.layers:
-            output = layer(output, # [num_queries, B, C]
+            output = layer(output, # [num_queries, B, D]
                            memory, 
                            query_pos=query_pos, 
                            pos=pos,
@@ -311,10 +315,10 @@ class Decoder(nn.Module):
         
         # 根据配置返回不同格式的结果
         if self.return_intermediate_dec:
-            # 将所有中间层输出堆叠成一个张量 [num_layers, batch_size, num_queries, hidden_dim]
+            # 将所有中间层输出堆叠成一个张量 [num_layers, B, num_queries, D]
             return torch.stack(intermediate, dim=0)
         else:
-            # 如果不需要中间结果，则只返回最后一层的输出，并添加一个维度以保持一致的返回格式
+            # 如果不需要中间结果，则只返回最后一层的输出 [1, B, num_queries, D]
             return output.unsqueeze(0)
 
 
@@ -323,18 +327,6 @@ class Decoder(nn.Module):
 # ==============================================================================
 
 class Transformer(nn.Module):
-    """
-    DETR中完整的Transformer模块，整合了Encoder和Decoder。
-    Args:
-        d_model (int): 特征维度。
-        nhead (int): 多头注意力头数。
-        num_encoder_layers (int): Encoder层数。
-        num_decoder_layers (int): Decoder层数。
-        dim_feedforward (int): 前馈网络隐藏层维度。
-        dropout (float): dropout概率。
-        activation (str): 激活函数类型。
-        return_intermediate_dec (bool): 是否返回所有Decoder中间层输出。
-    """
     def __init__(self, 
                  d_model: int = 256, # 原始论文就是d_model=256
                  nhead: int = 8, 
@@ -342,13 +334,14 @@ class Transformer(nn.Module):
                  num_decoder_layers: int = 6, 
                  dim_feedforward: int = 2048, # DETR原始论文中，并没有设置为d_model的4倍，而是2048
                  dropout: float = 0.1,
-                 activation: str = "relu", 
-                 return_intermediate_dec: bool = False):
+                 activation: str = "relu",  # 激活函数
+                 return_intermediate_dec: bool = False): # 是否返回解码器中间结果
         super().__init__()
 
         # --- Encoder ---
         encoder_layer = EncoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
-        self.encoder = Encoder(encoder_layer, num_encoder_layers)
+        encoder_norm = nn.LayerNorm(d_model)
+        self.encoder = Encoder(encoder_layer, num_encoder_layers, norm=encoder_norm)
 
         # --- Decoder ---
         decoder_layer = DecoderLayer(d_model, nhead, dim_feedforward, dropout, activation)
@@ -373,21 +366,21 @@ class Transformer(nn.Module):
         """
         Transformer前向传播。
         Args:
-            src (Tensor): Backbone的输出特征. [B, C, H, W]
+            src (Tensor): Backbone的输出特征. [B, D, H, W]
             mask (Tensor): 用于区分padding的mask. [B, H, W]
-            query_embed (Tensor): Object Queries, 可学习的查询向量. [num_queries, C]
-            pos_embed (Tensor): 位置编码. [B, C, H, W]
+            query_embed (Tensor): Object Queries, 可学习的查询向量. [num_queries, D]
+            pos_embed (Tensor): 位置编码. [B, D, H, W]
         Returns:
-            hs (Tensor): Decoder各层输出的集合. [num_layers, B, num_queries, C]
-            memory (Tensor): Encoder最后一层的输出. [B, C, H, W]
+            hs (Tensor): Decoder各层输出的集合. [num_layers, B, num_queries, D]
+            memory (Tensor): Encoder最后一层的输出. [B, D, H, W]
         """
         # --- 数据预处理 ---
-        # 将输入特征图和位置编码从 [B, C, H, W] 展平为 [H*W, B, C]
+        # 将输入特征图和位置编码从 [B, D, H, W] 展平为 [H*W, B, D]
         bs, c, h, w = src.shape
-        src = src.flatten(2).permute(2, 0, 1)  # [H*W, B, C]
-        pos_embed = pos_embed.flatten(2).permute(2, 0, 1) # [H*W, B, C]
+        src = src.flatten(2).permute(2, 0, 1)  # [H*W, B, D]
+        pos_embed = pos_embed.flatten(2).permute(2, 0, 1) # [H*W, B, D]
         
-        # 将Object Queries从 [num_queries, C] 扩展为 [num_queries, B, C]
+        # 将Object Queries从 [num_queries, D] 扩展为 [num_queries, B, D]
         # 这是Decoder的初始输入
         query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
         
@@ -398,38 +391,15 @@ class Transformer(nn.Module):
         tgt = torch.zeros_like(query_embed)
 
         # --- Encoder前向传播 ---
-        # memory 是编码后的图像特征 [H*W, B, C]
+        # memory 是编码后的图像特征 [H*W, B, D]
         memory = self.encoder(src, pos=pos_embed, src_key_padding_mask=mask)
 
         # --- Decoder前向传播 ---
-        # hs 是每一层decoder的输出
-        # 关键：query_pos是Object Queries的位置编码，pos是图像特征的位置编码
-        hs = self.decoder(tgt, memory, query_pos=query_embed, pos=pos_embed, memory_key_padding_mask=mask)
+        # hidden_states 是每一层decoder的输出，形状为 [num_layers 或 1, num_queries, B, D]
+        # 关键：查询嵌入 query_embed 是以位置编码的形式注入到Decoder中的⚠
+        hidden_states = self.decoder(tgt, memory, query_pos=query_embed, pos=pos_embed, memory_key_padding_mask=mask)
         
         # --- 输出格式整理 ---
-        # hs: [num_layers, B, num_queries, C] 或 [1, B, num_queries, C]
-        # memory: [H*W, B, C] -> [B, C, H, W]
-        return hs, memory.permute(1, 2, 0).view(bs, c, h, w)
-
-
-# ==============================================================================
-# 构建函数 (Builder Function)
-# ==============================================================================
-
-def build_transformer(args):
-    """
-    根据参数构建Transformer模型。
-    Args:
-        args: 包含Transformer相关参数的对象。
-    Returns:
-        Transformer: 构建好的Transformer实例。
-    """
-    return Transformer(
-        d_model=args.transformer_dim,
-        dropout=args.dropout,
-        nhead=args.nheads,
-        dim_feedforward=args.dim_feedforward,
-        num_encoder_layers=args.enc_layers,
-        num_decoder_layers=args.dec_layers,
-        return_intermediate_dec=args.return_intermediate_dec, # 是否返回中间结果
-    )
+        # hidden_states -> [num_layers 或 1, B, num_queries, D]
+        # memory -> [B, D, H, W]
+        return hidden_states.transpose(1, 2), memory.permute(1, 2, 0).contiguous().view(bs, c, h, w)
