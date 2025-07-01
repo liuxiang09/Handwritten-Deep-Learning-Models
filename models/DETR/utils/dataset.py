@@ -6,11 +6,60 @@ from PIL import Image
 from torch import Tensor
 import os
 import xml.etree.ElementTree as ET
+import torch.nn.functional as F
 
 
 def collate_fn(batch):
-    pass
+    images = [item['image'] for item in batch]
+    boxes = [item['boxes'] for item in batch]
+    labels = [item['labels'] for item in batch]
 
+    # 获取该批次中最大的图像尺寸
+    max_height = max(image.shape[1] for image in images)
+    max_width = max(image.shape[2] for image in images)
+
+    # 对图像进行padding
+    padded_images = []
+    masks = []
+    targets = []
+
+    for image in images:
+        c, h, w = image.shape
+
+        padding = (0, max_width - image.shape[2], 0, max_height - image.shape[1])
+        padded_image = F.pad(image, padding, value=0)
+        padded_images.append(padded_image)
+
+        # 创建mask，True代表填充区域，False代表有效区域
+        mask = torch.zeros((max_height, max_width), dtype=torch.bool)
+        mask[h:, :] = True  # 填充区域
+        mask[:, w:] = True  # 填充区域
+        masks.append(mask)
+
+    images_tensor = torch.stack(padded_images)
+    masks_tensor = torch.stack(masks)
+    
+    # 处理目标框和标签
+    for i, (box, label) in enumerate(zip(boxes, labels)):
+        # 获取对应图像的原始尺寸
+        orig_h, orig_w = images[i].shape[1], images[i].shape[2] # [C, H, W]
+        
+        # 归一化box坐标 (x1, y1, x2, y2) -> (0, 1)
+        normalized_boxes = box.clone()
+        normalized_boxes[:, [0, 2]] /= orig_w  # 归一化x坐标
+        normalized_boxes[:, [1, 3]] /= orig_h  # 归一化y坐标
+        
+        target = {
+            'boxes': normalized_boxes,
+            'labels': label
+        }
+        targets.append(target)
+
+    return {
+        'images': images_tensor, # [B, C, H, W]
+        'masks': masks_tensor, # [B, H, W]
+        'targets': targets # List -> 每个元素是一个字典，包含 'boxes' 和 'labels'
+    }
 
 class PascalVOCDataset(Dataset):
     """Pascal VOC数据集加载器"""
@@ -48,7 +97,13 @@ class PascalVOCDataset(Dataset):
                 y1 = float(bbox.find('ymin').text)
                 x2 = float(bbox.find('xmax').text)
                 y2 = float(bbox.find('ymax').text)
-                boxes.append([x1, y1, x2, y2])
+                
+                # 转换为cx, cy, w, h格式
+                cx = (x1 + x2) / 2
+                cy = (y1 + y2) / 2
+                w = x2 - x1
+                h = y2 - y1
+                boxes.append([cx, cy, w, h])
         
         return torch.tensor(boxes, dtype=torch.float32), torch.tensor(labels, dtype=torch.int64)
     

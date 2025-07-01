@@ -60,7 +60,7 @@ def test_set_criterion():
         targets.append(target)
     
     print(f"Target检测框数量列表: {[len(t['labels']) for t in targets]}")
-    NJUI
+    
     # 计算损失
     losses = criterion(outputs, targets)
     

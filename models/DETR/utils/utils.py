@@ -4,12 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from models.DETR.model.backbone import Backbone
-from models.DETR.model.transformer import Transformer
-from models.DETR.model.detr import DETR
-from models.DETR.model.matcher import HungarianMatcher
-from models.DETR.model.criterion import SetCriterion
-
 
 class NestedTensor(object):
     """
@@ -48,6 +42,17 @@ def cxcywh_to_xyxy(x: Tensor) -> Tensor:
          (x_c + 0.5 * w), (y_c + 0.5 * h)]
     return torch.stack(b, dim=-1)
 
+def xyxy_to_cxcywh(x: Tensor) -> Tensor:
+    """
+    [x1, y1, x2, y2] -> [cx, cy, w, h]
+    """
+    x1, y1, x2, y2 = x.unbind(-1)
+    w = x2 - x1
+    h = y2 - y1
+    x_c = x1 + 0.5 * w
+    y_c = y1 + 0.5 * h
+    return torch.stack([x_c, y_c, w, h], dim=-1)
+
 def box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     """
     计算两个box的IoU。
@@ -81,8 +86,10 @@ def generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
         GIoU: 形状为(N, M)的tensor，表示N个box和M个box的广义IoU。
     """
     # 确保boxes1和boxes2都不为空
-    assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
-    assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
+    assert (boxes1[:, 0] <= boxes1[:, 2]).all()
+    assert (boxes2[:, 0] <= boxes2[:, 2]).all()
+    assert (boxes1[:, 1] <= boxes1[:, 3]).all()
+    assert (boxes2[:, 1] <= boxes2[:, 3]).all()
     iou, union = box_iou(boxes1, boxes2)
     # 注意这里计算方式与上面有所不同，这里是找到最小闭包框
     lt = torch.min(boxes1[:, None, :2], boxes2[:, :2])
@@ -91,69 +98,17 @@ def generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     area = wh[:, :, 0] * wh[:, :, 1]
     return iou - (area - union) / (area + 1e-6)
 
-def build_model(args):
-    """构建DETR模型"""
-    # 构建backbone
-    backbone = Backbone(
-        name='resnet50',
-        train_backbone=True,
-        return_interm_layers=False,
-        dilation=False
-    )
+def create_nested_tensor(tensors: Tensor, mask: Optional[Tensor] = None) -> NestedTensor:
+    """
+    创建一个NestedTensor对象。
     
-    # 构建transformer
-    transformer = Transformer(
-        d_model=args.hidden_dim,
-        nhead=args.nheads,
-        num_encoder_layers=args.num_encoder_layers,
-        num_decoder_layers=args.num_decoder_layers,
-        dim_feedforward=2048,
-        dropout=args.dropout,
-        activation="relu",
-        normalize_before=False,
-        return_intermediate_dec=True
-    )
+    Args:
+        tensors: 输入的张量，形状为[B, C, H, W]。
+        mask: 可选的掩码，形状为[B, H, W]。
     
-    # 构建DETR模型
-    model = DETR(
-        backbone=backbone,
-        transformer=transformer,
-        num_classes=20,  # Pascal VOC有20个类别
-        num_queries=args.num_queries,
-        return_intermediate_dec=True
-    )
-    
-    return model
-
-
-def build_criterion(args):
-    """构建损失函数"""
-    # 构建匈牙利匹配器
-    matcher = HungarianMatcher(
-        cost_class=args.set_cost_class,
-        cost_bbox=args.set_cost_bbox,
-        cost_giou=args.set_cost_giou
-    )
-    
-    # 损失权重
-    weight_dict = {
-        'loss_ce': args.loss_ce,
-        'loss_bbox': args.loss_bbox,
-        'loss_giou': args.loss_giou
-    }
-    
-    # 添加辅助损失权重
-    aux_weight_dict = {}
-    for i in range(args.num_decoder_layers - 1):
-        aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
-    weight_dict.update(aux_weight_dict)
-    
-    # 构建损失函数
-    criterion = SetCriterion(
-        num_classes=20,
-        matcher=matcher,
-        weight_dict=weight_dict,
-        eos_coef=args.eos_coef
-    )
-    
-    return criterion
+    Returns:
+        NestedTensor对象。
+    """
+    if mask is None:
+        mask = torch.zeros(tensors.shape[:2], dtype=torch.bool, device=tensors.device)
+    return NestedTensor(tensors=tensors, mask=mask)
