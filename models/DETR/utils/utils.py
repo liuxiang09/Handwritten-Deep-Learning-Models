@@ -1,9 +1,14 @@
 from typing import Optional, List
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
+
+from models.DETR.model.backbone import Backbone
+from models.DETR.model.transformer import Transformer
+from models.DETR.model.detr import DETR
+from models.DETR.model.matcher import HungarianMatcher
+from models.DETR.model.criterion import SetCriterion
 
 
 class NestedTensor(object):
@@ -86,4 +91,69 @@ def generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     area = wh[:, :, 0] * wh[:, :, 1]
     return iou - (area - union) / (area + 1e-6)
 
+def build_model(args):
+    """构建DETR模型"""
+    # 构建backbone
+    backbone = Backbone(
+        name='resnet50',
+        train_backbone=True,
+        return_interm_layers=False,
+        dilation=False
+    )
+    
+    # 构建transformer
+    transformer = Transformer(
+        d_model=args.hidden_dim,
+        nhead=args.nheads,
+        num_encoder_layers=args.num_encoder_layers,
+        num_decoder_layers=args.num_decoder_layers,
+        dim_feedforward=2048,
+        dropout=args.dropout,
+        activation="relu",
+        normalize_before=False,
+        return_intermediate_dec=True
+    )
+    
+    # 构建DETR模型
+    model = DETR(
+        backbone=backbone,
+        transformer=transformer,
+        num_classes=20,  # Pascal VOC有20个类别
+        num_queries=args.num_queries,
+        return_intermediate_dec=True
+    )
+    
+    return model
 
+
+def build_criterion(args):
+    """构建损失函数"""
+    # 构建匈牙利匹配器
+    matcher = HungarianMatcher(
+        cost_class=args.set_cost_class,
+        cost_bbox=args.set_cost_bbox,
+        cost_giou=args.set_cost_giou
+    )
+    
+    # 损失权重
+    weight_dict = {
+        'loss_ce': args.loss_ce,
+        'loss_bbox': args.loss_bbox,
+        'loss_giou': args.loss_giou
+    }
+    
+    # 添加辅助损失权重
+    aux_weight_dict = {}
+    for i in range(args.num_decoder_layers - 1):
+        aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
+    weight_dict.update(aux_weight_dict)
+    
+    # 构建损失函数
+    criterion = SetCriterion(
+        num_classes=20,
+        matcher=matcher,
+        weight_dict=weight_dict,
+        eos_coef=args.eos_coef
+    )
+    
+    return criterion
