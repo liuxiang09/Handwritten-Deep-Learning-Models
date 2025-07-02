@@ -53,6 +53,13 @@ def xyxy_to_cxcywh(x: Tensor) -> Tensor:
     y_c = y1 + 0.5 * h
     return torch.stack([x_c, y_c, w, h], dim=-1)
 
+# 将坐标从相对值（0-1）缩放到绝对像素值
+def rescale_bboxes(out_bbox: Tensor, image_size: Tensor) -> Tensor:
+    img_h, img_w = image_size.unbind(1)
+    b = cxcywh_to_xyxy(out_bbox) # [B, 4]
+    b = b * torch.stack([img_w, img_h, img_w, img_h], dim=1) # [B, 4]
+    return b
+
 def box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     """
     计算两个box的IoU。

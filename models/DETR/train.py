@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument("--data_dir", type=str, default="./data/Pascal_VOC/VOC2012_train_val/VOC2012_train_val")
     parser.add_argument("--save_dir", type=str, default="./models/DETR/checkpoints")
     parser.add_argument("--log_dir", type=str, default="./models/DETR/logs")
+    parser.add_argument("--resume", type=str, default="", help="检查点路径，用于恢复训练")
 
     # 训练相关参数
     parser.add_argument("--batch_size", type=int, default=4)
@@ -49,9 +50,8 @@ def parse_args():
     parser.add_argument("--eos_coef", type=float, default=0.1)
     
     # 其他参数
-    parser.add_argument("--train", action="store_true")
-    parser.add_argument("--eval", action="store_true")
-    parser.add_argument("--resume", type=str, default="")
+    parser.add_argument("--train", action="store_true", help="训练模式")
+    parser.add_argument("--eval", action="store_true", help="训练时进行验证")
     parser.add_argument("--save_epochs", type=int, default=1)
     parser.add_argument("--print_steps", type=int, default=50)
     parser.add_argument("--max_size", type=int, default=800)
@@ -115,7 +115,25 @@ def save_checkpoint(model, optimizer, epoch, loss, save_path):
         'loss': loss,
     }
     torch.save(checkpoint, save_path)
-    print(f"=====> 检查点已保存到 {save_path}")
+
+
+def load_model_for_eval(model, model_path):
+    """加载模型用于评估"""
+    print(f"=====> 正在加载模型: {model_path}")
+    checkpoint = torch.load(model_path, map_location='cpu')
+    
+    # 处理不同的保存格式
+    if 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+        epoch = checkpoint.get('epoch', 0)
+        loss = checkpoint.get('loss', 0.0)
+        print(f"=====> 模型加载成功 (Epoch: {epoch}, Loss: {loss:.4f})")
+    else:
+        # 如果直接保存的是模型参数
+        model.load_state_dict(checkpoint)
+        print("=====> 模型参数加载成功")
+    
+    return model
 
 
 def load_checkpoint(model, optimizer, checkpoint_path):
@@ -159,19 +177,8 @@ def main():
             num_workers=args.num_workers,
             collate_fn=collate_fn
         )
-        for i, data_dic in enumerate(train_loader):
-            images = data_dic['images']
-            masks = data_dic['masks']
-            targets = data_dic['targets']
-            print(f"第{i}批次 - 图像形状: {images.shape}")
-            print(f"        - 掩码形状: {masks.shape}")
-            print(f"目标数量: {len(targets)}")
-            for j, target in enumerate(targets):
-                print(f"  样本{j}: 类别数={len(target['labels'])}, 边界框数={len(target['boxes'])}")
-            print("-" * 50)
-            break
 
-    # 评估数据集
+    # 验证数据集
     if args.eval:
         val_dataset = PascalVOCDataset(
             data_dir=args.data_dir,
@@ -186,14 +193,14 @@ def main():
             num_workers=args.num_workers,
             collate_fn=collate_fn
         )
-    input("Press Enter to continue...")
+    
     # 构建模型
     model = build_model(args).to(device)
     print("=====> 模型构建完成")
     criterion = build_criterion(args).to(device)
     print("=====> 损失函数构建完成")
     
-    # 输出模型训练参数量
+    # 输出模型参数量
     print(f"\n模型总参数量: {sum(p.numel() for p in model.parameters()):,}")
     print(f"模型可训练参数量: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
     
@@ -213,7 +220,8 @@ def main():
     start_epoch = 0
     best_loss = float('inf')
     
-    # 恢复训练
+    # 加载预训练模型，恢复训练
+
     if args.resume and os.path.exists(args.resume):
         print(f"Resuming training from {args.resume}")
         start_epoch, _ = load_checkpoint(model, optimizer, args.resume)
@@ -238,7 +246,7 @@ def main():
                 # 保存最佳模型
                 if val_loss < best_loss:
                     best_loss = val_loss
-                    best_model_path = os.path.join(args.log_dir, 'best_model.pth')
+                    best_model_path = os.path.join(args.save_dir, f'best_model_epoch_{epoch+1}.pth')
                     save_checkpoint(model, optimizer, epoch, val_loss, best_model_path)
                     print(f"Best model saved to {best_model_path}")
             
@@ -248,10 +256,7 @@ def main():
                 save_checkpoint(model, optimizer, epoch, train_loss, checkpoint_path)
                 print(f"Checkpoint saved to {checkpoint_path}")
         
-        # 保存最终模型
-        final_model_path = os.path.join(args.save_dir, 'detr_1.pth')
-        save_checkpoint(model, optimizer, epoch, train_loss, final_model_path)
-        print(f"Final model saved to {final_model_path}")
+        print("Training completed!")
 
 
 if __name__ == "__main__":

@@ -1,297 +1,186 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
 import os
-import sys
 import argparse
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-import matplotlib.pyplot as plt
 from tqdm import tqdm
-
-# 添加项目路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import numpy as np
+from collections import defaultdict
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 # 导入DETR模型相关模块
-from model.detr import DETR
-from model.backbone import Backbone
-from model.transformer import Transformer
-from utils.dataset import PascalVOCDataset, get_transforms, collate_fn
-from utils.utils import NestedTensor, cxcywh_to_xyxy
-
+from models.DETR.model import DETR, Backbone, Transformer
+from models.DETR.utils import PascalVOCDataset, collate_fn, cxcywh_to_xyxy, box_iou, compute_ap
+from models.DETR.utils.eval_utils import evaluate_ap_ar
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description="Evaluate DETR Object Detection Model")
+    parser = argparse.ArgumentParser(description="Test DETR Object Detection Model")
     
-    parser.add_argument("--data_dir", type=str, default="/home/hpc/Desktop/Pytorch/data/Pascal_VOC",
-                        help="Pascal VOC dataset directory")
-    parser.add_argument("--checkpoint", type=str, required=True,
-                        help="Path to model checkpoint")
-    parser.add_argument("--output_dir", type=str, default="/home/hpc/Desktop/Pytorch/models/DETR/eval_results",
-                        help="Directory to save evaluation results")
-    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for evaluation")
-    parser.add_argument("--num_workers", type=int, default=4, help="Number of data loading workers")
-    parser.add_argument("--device", type=str, default="auto", help="Device (cuda/cpu/auto)")
-    parser.add_argument("--confidence_threshold", type=float, default=0.5, help="Confidence threshold for detection")
-    parser.add_argument("--max_size", type=int, default=800, help="Maximum image size")
-    parser.add_argument("--num_samples", type=int, default=10, help="Number of samples to visualize")
+    # 路径相关参数
+    parser.add_argument("--data_dir", type=str, default="./data/Pascal_VOC/VOC2012_test/VOC2012_test", help="数据集路径")
+    parser.add_argument("--model_path", type=str, required=True, help="模型文件路径")
+    parser.add_argument("--results_dir", type=str, default="./models/DETR/results", help="结果保存路径")
+
+    # 测试相关参数
+    parser.add_argument("--batch_size", type=int, default=4, help="批次大小")
+    parser.add_argument("--num_workers", type=int, default=4, help="数据加载线程数")
+    parser.add_argument("--split", type=str, default="val", choices=["val", "test"], help="测试数据集分割")
+    
+    # 模型相关参数
+    parser.add_argument("--num_queries", type=int, default=100, help="查询数量")
+    parser.add_argument("--num_classes", type=int, default=20, help="类别数量")
+    parser.add_argument("--hidden_dim", type=int, default=256, help="隐藏层维度")
+    parser.add_argument("--nheads", type=int, default=8, help="注意力头数")
+    parser.add_argument("--num_encoder_layers", type=int, default=6, help="编码器层数")
+    parser.add_argument("--num_decoder_layers", type=int, default=6, help="解码器层数")
+    parser.add_argument("--dropout", type=float, default=0.1, help="Dropout概率")
+        
+    # 评估参数
+    parser.add_argument("--conf_threshold", type=float, default=0.5, help="置信度阈值")
+    parser.add_argument("--iou_threshold", type=float, default=0.5, help="IoU阈值")
+    parser.add_argument("--save_predictions", type=bool, default=True, help="保存预测结果")
+    parser.add_argument("--save_visualizations", type=bool, default=True, help="保存可视化结果")
     
     return parser.parse_args()
 
 
-def build_model():
+def build_model(args):
     """构建DETR模型"""
-    # 构建backbone
-    backbone = Backbone(
-        name='resnet50',
-        train_backbone=True,
-        return_interm_layers=False,
-        dilation=False
-    )
+    # 创建backbone
+    backbone = Backbone(name="resnet50", train_backbone=True, return_interm_layers=False, dilation=False)
     
-    # 构建transformer
+    # 创建transformer
     transformer = Transformer(
-        d_model=256,
-        nhead=8,
-        num_encoder_layers=6,
-        num_decoder_layers=6,
+        d_model=args.hidden_dim,
+        nhead=args.nheads,
+        num_encoder_layers=args.num_encoder_layers,
+        num_decoder_layers=args.num_decoder_layers,
         dim_feedforward=2048,
-        dropout=0.1,
-        activation="relu",
-        normalize_before=False,
-        return_intermediate_dec=True
+        dropout=args.dropout
     )
     
-    # 构建DETR模型
+    # 创建DETR模型
     model = DETR(
         backbone=backbone,
         transformer=transformer,
-        num_classes=20,  # Pascal VOC有20个类别
-        num_queries=100,
-        return_intermediate_dec=True
+        num_classes=args.num_classes,
+        num_queries=args.num_queries,
+        return_intermediate_dec=False
     )
     
     return model
 
 
-def load_model(checkpoint_path, device):
-    """加载训练好的模型"""
-    model = build_model()
+def load_model(model, model_path):
+    """加载模型"""
+    print(f"=====> 正在加载模型: {model_path}")
     
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
-    model.eval()
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"模型文件不存在: {model_path}")
     
-    print(f"Model loaded from {checkpoint_path}")
-    if 'epoch' in checkpoint:
-        print(f"Trained for {checkpoint['epoch']+1} epochs")
-    if 'loss' in checkpoint:
-        print(f"Final training loss: {checkpoint['loss']:.4f}")
+    checkpoint = torch.load(model_path, map_location='cpu')
+    
+    # 处理不同的保存格式
+    if 'model_state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['model_state_dict'])
+        epoch = checkpoint.get('epoch', 0)
+        loss = checkpoint.get('loss', 0.0)
+        print(f"=====> 模型加载成功 (Epoch: {epoch}, Loss: {loss:.4f})")
+    else:
+        # 如果直接保存的是模型参数
+        model.load_state_dict(checkpoint)
+        print("=====> 模型参数加载成功")
     
     return model
-
-
-def create_nested_tensor(images):
-    """将图像转换为NestedTensor格式"""
-    batch_size, channels, height, width = images.shape
-    mask = torch.zeros((batch_size, height, width), dtype=torch.bool, device=images.device)
-    return NestedTensor(images, mask)
-
-
-@torch.no_grad()
-def detect_objects(model, images, confidence_threshold=0.5):
-    """
-    使用模型检测目标
-    
-    Args:
-        model: DETR模型
-        images: 输入图像 [B, 3, H, W]
-        confidence_threshold: 置信度阈值
-    
-    Returns:
-        检测结果列表
-    """
-    nested_images = create_nested_tensor(images)
-    outputs = model(nested_images)
-    
-    # 获取预测结果
-    pred_logits = outputs['pred_logits']  # [B, num_queries, num_classes+1]
-    pred_boxes = outputs['pred_boxes']    # [B, num_queries, 4]
-    
-    # 计算概率
-    prob = pred_logits.softmax(-1)  # [B, num_queries, num_classes+1]
-    scores, labels = prob[..., :-1].max(-1)  # 排除"无目标"类别
-    
-    results = []
-    for i in range(len(images)):
-        # 过滤低置信度检测
-        keep = scores[i] > confidence_threshold
-        
-        result = {
-            'scores': scores[i][keep],
-            'labels': labels[i][keep],
-            'boxes': pred_boxes[i][keep],
-        }
-        results.append(result)
-    
-    return results
-
-
-def visualize_detections(image, detections, class_names, save_path=None):
-    """
-    可视化检测结果
-    
-    Args:
-        image: PIL图像
-        detections: 检测结果字典
-        class_names: 类别名称列表
-        save_path: 保存路径
-    """
-    draw = ImageDraw.Draw(image)
-    
-    # 尝试加载字体
-    try:
-        font = ImageFont.truetype("arial.ttf", 16)
-    except:
-        font = ImageFont.load_default()
-    
-    colors = plt.cm.tab20(np.linspace(0, 1, len(class_names)))
-    
-    for i, (score, label, box) in enumerate(zip(
-        detections['scores'], detections['labels'], detections['boxes']
-    )):
-        # 转换边界框格式 (cx, cy, w, h) -> (x1, y1, x2, y2)
-        cx, cy, w, h = box
-        x1 = (cx - w/2) * image.width
-        y1 = (cy - h/2) * image.height
-        x2 = (cx + w/2) * image.width
-        y2 = (cy + h/2) * image.height
-        
-        # 绘制边界框
-        color = tuple(int(c * 255) for c in colors[label][:3])
-        draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
-        
-        # 绘制标签
-        class_name = class_names[label]
-        text = f"{class_name}: {score:.2f}"
-        draw.text((x1, y1-20), text, fill=color, font=font)
-    
-    if save_path:
-        image.save(save_path)
-        print(f"Visualization saved to {save_path}")
-    
-    return image
-
-
-@torch.no_grad()
-def evaluate_model(model, data_loader, device, args):
-    """评估模型"""
-    print("Starting evaluation...")
-    
-    model.eval()
-    total_detections = 0
-    total_images = 0
-    
-    # 创建输出目录
-    os.makedirs(args.output_dir, exist_ok=True)
-    
-    # Pascal VOC类别名称
-    class_names = PascalVOCDataset.VOC_CLASSES
-    
-    sample_count = 0
-    for batch_idx, (images, targets) in enumerate(tqdm(data_loader, desc="Evaluating")):
-        images = images.to(device)
-        
-        # 检测目标
-        detections = detect_objects(model, images, args.confidence_threshold)
-        
-        # 统计
-        for i, detection in enumerate(detections):
-            total_detections += len(detection['scores'])
-            total_images += 1
-            
-            # 可视化前几个样本
-            if sample_count < args.num_samples:
-                # 反归一化图像
-                image_tensor = images[i].cpu()
-                mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-                std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-                image_tensor = image_tensor * std + mean
-                image_tensor = torch.clamp(image_tensor, 0, 1)
-                
-                # 转换为PIL图像
-                image_pil = transforms.ToPILImage()(image_tensor)
-                
-                # 可视化检测结果
-                vis_image = visualize_detections(
-                    image_pil.copy(), 
-                    detection, 
-                    class_names,
-                    save_path=os.path.join(args.output_dir, f"detection_{sample_count:03d}.jpg")
-                )
-                
-                sample_count += 1
-        
-        # 打印进度
-        if batch_idx % 10 == 0:
-            avg_detections = total_detections / max(total_images, 1)
-            print(f"Batch [{batch_idx}] - Avg detections per image: {avg_detections:.2f}")
-    
-    # 打印最终统计
-    avg_detections = total_detections / max(total_images, 1)
-    print(f"\nEvaluation completed!")
-    print(f"Total images: {total_images}")
-    print(f"Total detections: {total_detections}")
-    print(f"Average detections per image: {avg_detections:.2f}")
-    print(f"Confidence threshold: {args.confidence_threshold}")
-    print(f"Results saved to: {args.output_dir}")
 
 
 def main():
     args = parse_args()
     
-    # 验证路径
-    if not os.path.exists(args.data_dir):
-        raise FileNotFoundError(f"Data directory not found: {args.data_dir}")
+    # 创建结果保存目录
+    os.makedirs(args.results_dir, exist_ok=True)
     
-    if not os.path.exists(args.checkpoint):
-        raise FileNotFoundError(f"Checkpoint not found: {args.checkpoint}")
-    
-    # 设置设备
-    if args.device == "auto":
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    else:
-        device = torch.device(args.device)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
-    # 加载模型
-    model = load_model(args.checkpoint, device)
-    
-    # 准备数据
-    val_transform = get_transforms(train=False, max_size=args.max_size)
-    val_dataset = PascalVOCDataset(
+    # 数据预处理
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+    # 测试数据集
+    test_dataset = PascalVOCDataset(
         data_dir=args.data_dir,
-        split='val',
-        transform=val_transform,
-        max_size=args.max_size
+        split=args.split,
+        transform=transform
     )
-    
-    val_loader = DataLoader(
-        val_dataset,
+
+    test_loader = DataLoader(
+        test_dataset,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        pin_memory=True,
         collate_fn=collate_fn
     )
     
-    print(f"Validation dataset: {len(val_dataset)} images")
+    print(f"测试数据集大小: {len(test_dataset)}")
+    print(f"测试批次数量: {len(test_loader)}")
+    
+    # 构建模型
+    model = build_model(args).to(device)
+    print("=====> 模型构建完成")
+    
+    # 输出模型参数量
+    print(f"\n模型总参数量: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"模型可训练参数量: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+    
+    # 加载模型
+    model = load_model(model, args.model_path)
     
     # 评估模型
-    evaluate_model(model, val_loader, device, args)
+    results = evaluate_ap_ar(model, test_loader, device, args.conf_threshold)
+    
+    # 输出结果
+    print("\n" + "="*60)
+    print("DETR检测评估结果 (COCO风格指标):")
+    print("="*60)
+    print(f"AP@0.5      : {results['AP@0.5']:.4f}")
+    print(f"AP@0.75     : {results['AP@0.75']:.4f}")
+    print(f"AP@[0.5:0.95]: {results['AP@[0.5:0.95]']:.4f}")
+    print(f"置信度阈值: {args.conf_threshold}")
+    
+    print("\n各类别AP@0.5详情:")
+    print("-" * 60)
+    for i, (class_name, ap) in enumerate(zip(results['class_names'], results['class_aps@0.5'])):
+        print(f"{class_name:12}: {ap:.4f}")
+    
+    print("="*60)
+    
+    # 保存结果
+    if args.save_predictions:
+        results_file = os.path.join(args.results_dir, f"Results_VOC_{args.split}.txt")
+        with open(results_file, 'w', encoding='utf-8') as f:
+            f.write("DETR目标检测模型评估结果 (COCO风格指标)\n")
+            f.write("="*60 + "\n")
+            f.write(f"模型路径: {args.model_path}\n")
+            f.write(f"数据集分割: {args.split}\n")
+            f.write(f"置信度阈值: {args.conf_threshold}\n")
+            f.write(f"批次大小: {args.batch_size}\n")
+            f.write(f"\n总体指标:\n")
+            f.write(f"AP@0.5      : {results['AP@0.5']:.4f}\n")
+            f.write(f"AP@0.75     : {results['AP@0.75']:.4f}\n")
+            f.write(f"AP@[0.5:0.95]: {results['AP@[0.5:0.95]']:.4f}\n")
+            f.write(f"\n各类别AP@0.5详细指标:\n")
+            f.write("-" * 60 + "\n")
+            
+            for class_name, ap in zip(results['class_names'], results['class_aps@0.5']):
+                f.write(f"{class_name:12}: {ap:.4f}\n")
+        
+        print(f"结果已保存到: {results_file}")
 
 
 if __name__ == "__main__":
