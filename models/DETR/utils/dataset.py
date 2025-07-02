@@ -128,7 +128,7 @@ class PascalVOCDataset(Dataset):
 
 if __name__ == "__main__":
     # 测试数据集加载器
-    data_dir = "e:/Handwritten-Deep-Learning-Models/data/Pascal_VOC/VOC2012_train_val/VOC2012_train_val"
+    data_dir = "./data/Pascal_VOC/VOC2012_train_val/VOC2012_train_val"
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -137,8 +137,28 @@ if __name__ == "__main__":
     dataset = PascalVOCDataset(data_dir=data_dir, split='train', transform=transform)
     print(f"数据集大小: {len(dataset)}")
     
-    # 测试第一个样本
-    sample = dataset[0]
-    print(f"图片形状: {sample['image'].shape}")
-    print(f"标注框: {sample['boxes']}")
-    print(f"类别: {sample['labels']}")
+    for i in range(4):  # 打印前5个样本的信息
+        sample = dataset[i]
+        print(f"\n第{i+1}个样本:")
+        print(f"图片形状: {sample['image'].shape}")
+        print(f"标注框: {sample['boxes']}")
+        print(f"类别: {sample['labels']}")
+
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=4,
+        shuffle=False,
+        collate_fn=collate_fn,
+        num_workers=2
+    )
+
+    for idx, batch in enumerate(dataloader):
+        if idx < 5:
+            print(f"\n第{idx+1}个批次:")
+            print(f"图片形状: {batch['images'].shape}")
+            print(f"标注框: {batch['targets']}")
+            print(f"掩码形状: {batch['masks'].shape}")
+        else:
+            break
+
+    print("数据加载器测试完成。")
