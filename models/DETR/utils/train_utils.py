@@ -25,7 +25,7 @@ def train_one_epoch(args, model, criterion, data_loader, optimizer, device, epoc
         
         # 计算损失
         loss_dict = criterion(outputs, targets)
-        losses = sum(loss_dict[k] * criterion.weight_dict[k] for k in loss_dict.keys())
+        losses = sum(loss_dict.values())
         
         # 反向传播
         optimizer.zero_grad()
@@ -40,12 +40,12 @@ def train_one_epoch(args, model, criterion, data_loader, optimizer, device, epoc
         running_loss += losses.item()
         
         # 更新进度条
-        if batch_idx % 10 == 0:
+        if (batch_idx + 1) % 10 == 0:
             pbar.set_postfix({
-            'Loss': f"{losses.item():.4f}",
-            'CE': f"{loss_dict['loss_ce'].item():.4f}",
-            'Bbox': f"{loss_dict['loss_bbox'].item():.4f}",
-            'GIoU': f"{loss_dict['loss_giou'].item():.4f}",
+            'Loss': f"{losses.item()/(batch_idx + 1):.4f}",
+            'loss_ce': f"{loss_dict['loss_ce'].item()/(batch_idx + 1):.4f}",
+            'loss_bbox': f"{loss_dict['loss_bbox'].item()/(batch_idx + 1):.4f}",
+            'loss_giou': f"{loss_dict['loss_giou'].item()/(batch_idx + 1):.4f}",
         })
         
     

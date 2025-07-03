@@ -47,18 +47,9 @@ def xyxy_to_cxcywh(x: Tensor) -> Tensor:
     [x1, y1, x2, y2] -> [cx, cy, w, h]
     """
     x1, y1, x2, y2 = x.unbind(-1)
-    w = x2 - x1
-    h = y2 - y1
-    x_c = x1 + 0.5 * w
-    y_c = y1 + 0.5 * h
-    return torch.stack([x_c, y_c, w, h], dim=-1)
-
-# 将坐标从相对值（0-1）缩放到绝对像素值
-def rescale_bboxes(out_bbox: Tensor, image_size: Tensor) -> Tensor:
-    img_h, img_w = image_size.unbind(1)
-    b = cxcywh_to_xyxy(out_bbox) # [B, 4]
-    b = b * torch.stack([img_w, img_h, img_w, img_h], dim=1) # [B, 4]
-    return b
+    b = [(x1 + x2) / 2, (y1 + y2) / 2,
+         (x2 - x1), (y2 - y1)]
+    return torch.stack(b, dim=-1)
 
 def box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     """
@@ -92,11 +83,8 @@ def generalized_box_iou(boxes1: Tensor, boxes2: Tensor) -> Tensor:
     Returns:
         GIoU: 形状为(N, M)的tensor，表示N个box和M个box的广义IoU。
     """
-    # 确保boxes1和boxes2都不为空
-    assert (boxes1[:, 0] <= boxes1[:, 2]).all()
-    assert (boxes2[:, 0] <= boxes2[:, 2]).all()
-    assert (boxes1[:, 1] <= boxes1[:, 3]).all()
-    assert (boxes2[:, 1] <= boxes2[:, 3]).all()
+    assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
+    assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
     iou, union = box_iou(boxes1, boxes2)
     # 注意这里计算方式与上面有所不同，这里是找到最小闭包框
     lt = torch.min(boxes1[:, None, :2], boxes2[:, :2])

@@ -4,10 +4,6 @@ from models.DETR.model.criterion import SetCriterion
 from models.DETR.model.matcher import HungarianMatcher
 
 # 全局参数配置
-# 匹配器参数
-COST_CLASS = 1.0
-COST_BBOX = 5.0
-COST_GIOU = 2.0
 
 # 损失函数参数
 NUM_CLASSES = 90
@@ -23,7 +19,6 @@ WEIGHT_DICT = {
 # 测试数据参数
 BATCH_SIZE = 8
 NUM_QUERIES = 100
-TEST_OBJECTS = 3
 
 
 def test_set_criterion():
@@ -31,7 +26,7 @@ def test_set_criterion():
     print("开始测试 SetCriterion...")
     
     # 创建匹配器和损失函数实例
-    matcher = HungarianMatcher(cost_class=COST_CLASS, cost_bbox=COST_BBOX, cost_giou=COST_GIOU)
+    matcher = HungarianMatcher()
     criterion = SetCriterion(
         num_classes=NUM_CLASSES,
         matcher=matcher,
@@ -42,11 +37,11 @@ def test_set_criterion():
     
     # 准备模型输出
     outputs = {
-        'pred_logits': torch.rand(BATCH_SIZE, NUM_QUERIES, NUM_CLASSES + 1),
+        'pred_labels': torch.rand(BATCH_SIZE, NUM_QUERIES, NUM_CLASSES + 1),
         'pred_boxes': torch.rand(BATCH_SIZE, NUM_QUERIES, 4)
     }
-    
-    print(f"预测类别logits形状: {outputs['pred_logits'].shape}") # [B, 100, 91]
+
+    print(f"预测类别logits形状: {outputs['pred_labels'].shape}") # [B, 100, 91]
     print(f"预测边界框形状: {outputs['pred_boxes'].shape}") # [B, 100, 4]
     
     # 准备目标
@@ -66,9 +61,6 @@ def test_set_criterion():
     
     print("损失计算结果:")
     # 先加权损失并赋值回 losses 字典
-    losses['loss_ce'] = losses['loss_ce'] * criterion.weight_dict['loss_ce']
-    losses['loss_bbox'] = losses['loss_bbox'] * criterion.weight_dict['loss_bbox']
-    losses['loss_giou'] = losses['loss_giou'] * criterion.weight_dict['loss_giou']
     total_loss = sum(losses.values()) # 计算总损失
 
     print(f"{losses['loss_ce'].item():.4f} (加权分类损失)")

@@ -93,19 +93,9 @@ class DETR(nn.Module):
 
         # 5. 只取最后一层输出
         out = {
-            'pred_logits': outputs_class[-1],  # [B, num_queries, num_classes+1]
+            'pred_labels': outputs_class[-1],  # [B, num_queries, num_classes+1]
             'pred_boxes': outputs_coord[-1]    # [B, num_queries, 4]
         }
-        
-        # 辅助损失(训练时使用)
-        if self.return_intermediate_dec:
-            out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord)
             
         return out
-
-    @torch.jit.unused
-    def _set_aux_loss(self, outputs_class, outputs_coord):
-        # 收集中间层输出用于辅助损失，返回一个字典列表
-        return [{'pred_logits': a, 'pred_boxes': b}
-                for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
     

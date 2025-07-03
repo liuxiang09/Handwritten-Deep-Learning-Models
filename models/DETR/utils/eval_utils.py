@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm
-from .utils import create_nested_tensor, rescale_bboxes
+from .utils import create_nested_tensor
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 import torch.nn.functional as F
 

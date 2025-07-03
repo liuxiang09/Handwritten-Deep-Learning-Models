@@ -42,7 +42,7 @@ def parse_args():
     
     # 损失相关参数
     parser.add_argument("--cost_class", type=float, default=1.0)
-    parser.add_argument("--cost_bbox", type=float, default=5.0)
+    parser.add_argument("--cost_L1", type=float, default=5.0)
     parser.add_argument("--cost_giou", type=float, default=2.0)
     parser.add_argument("--loss_ce", type=float, default=1.0)
     parser.add_argument("--loss_bbox", type=float, default=5.0)
@@ -88,7 +88,7 @@ def build_criterion(args):
     """构建损失函数"""
     matcher = HungarianMatcher(
         cost_class=args.cost_class,
-        cost_bbox=args.cost_bbox,
+        cost_L1=args.cost_L1,
         cost_giou=args.cost_giou
     )
     

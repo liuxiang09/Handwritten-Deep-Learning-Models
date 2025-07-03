@@ -87,33 +87,3 @@ class PositionEmbeddingLearned(nn.Module):
         ], dim=-1).permute(2, 0, 1).unsqueeze(0).repeat(x.mask.shape[0], 1, 1, 1)
 
         return pos
-
-
-
-def build_position_encoding(args):
-    """
-    根据参数构建位置编码。
-    
-    Args:
-        args: 包含position_embedding和hidden_dim的参数对象
-    
-    Returns:
-        位置编码模块
-    """
-    N_steps = args.hidden_dim // 2
-    
-    if args.position_embedding in ('v2', 'sine'):
-        # 使用正弦位置编码
-        position_embedding = PositionEmbeddingSine(
-            num_pos_feats=N_steps,
-            normalize=True
-        )
-    elif args.position_embedding in ('v3', 'learned'):
-        # 使用可学习的位置编码
-        position_embedding = PositionEmbeddingLearned(
-            num_pos_feats=N_steps
-        )
-    else:
-        raise ValueError(f"不支持的位置编码类型: {args.position_embedding}")
-    
-    return position_embedding

@@ -7,6 +7,9 @@ from torch import Tensor
 import os
 import xml.etree.ElementTree as ET
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.patches as patches
 
 
 def collate_fn(batch):
@@ -137,28 +140,104 @@ if __name__ == "__main__":
     dataset = PascalVOCDataset(data_dir=data_dir, split='train', transform=transform)
     print(f"数据集大小: {len(dataset)}")
     
-    for i in range(4):  # 打印前5个样本的信息
-        sample = dataset[i]
-        print(f"\n第{i+1}个样本:")
-        print(f"图片形状: {sample['image'].shape}")
-        print(f"标注框: {sample['boxes']}")
-        print(f"类别: {sample['labels']}")
+    # for i in range(4):  # 打印前5个样本的信息
+    #     sample = dataset[i]
+    #     print(f"\n第{i+1}个样本:")
+    #     print(f"图片形状: {sample['image'].shape}")
+    #     print(f"标注框: {sample['boxes']}")
+    #     print(f"类别: {sample['labels']}")
 
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=4,
-        shuffle=False,
+        shuffle=True,
         collate_fn=collate_fn,
         num_workers=2
     )
 
-    for idx, batch in enumerate(dataloader):
-        if idx < 5:
-            print(f"\n第{idx+1}个批次:")
-            print(f"图片形状: {batch['images'].shape}")
-            print(f"标注框: {batch['targets']}")
-            print(f"掩码形状: {batch['masks'].shape}")
-        else:
-            break
+    # for idx, batch in enumerate(dataloader):
+    #     if idx < 5:
+    #         print(f"\n第{idx+1}个批次:")
+    #         print(f"图片形状: {batch['images'].shape}")
+    #         print(f"标注框: {batch['targets']}")
+    #         print(f"掩码形状: {batch['masks'].shape}")
+    #     else:
+    #         break
 
     print("数据加载器测试完成。")
+    
+    # 可视化部分：检查padding和掩码
+    def visualize_padding_and_mask(batch, sample_idx=0):
+        """
+        可视化一个批次中的图像、padding和掩码
+        
+        Args:
+            batch: 数据批次
+            sample_idx: 要可视化的样本索引
+        """
+        # 获取图像、掩码和目标框
+        image = batch['images'][sample_idx].cpu()
+        mask = batch['masks'][sample_idx].cpu()
+        targets = batch['targets'][sample_idx]
+        boxes = targets['boxes'].cpu()
+        
+        # 获取原始图像尺寸（非padding部分）
+        # 找到mask中为False的最大行和列索引
+        valid_mask = ~mask  # 取反，现在False是padding，True是有效区域
+        valid_rows = torch.any(valid_mask, dim=1)
+        valid_cols = torch.any(valid_mask, dim=0)
+        orig_height = valid_rows.sum().item()
+        orig_width = valid_cols.sum().item()
+        
+        # 反归一化图像（根据之前使用的normalize参数）
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+        image = image * std + mean
+        
+        # 转换为numpy进行可视化
+        img_np = image.permute(1, 2, 0).numpy()
+        img_np = np.clip(img_np, 0, 1)  # 裁剪到[0,1]范围
+        
+        # 创建图形
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        
+        # 1. 显示原始图像（带填充）
+        axes[0].imshow(img_np)
+        axes[0].set_title('Padded Image')
+        axes[0].axis('off')
+        
+        # 2. 显示掩码（True=黑色(padding)，False=灰色(有效区域)）
+        mask_display = np.zeros_like(mask.numpy(), dtype=np.float32)
+        mask_display[mask.numpy()] = 0.0  # 黑色表示padding区域(True)
+        mask_display[~mask.numpy()] = 0.7  # 灰色表示有效区域(False)
+        axes[1].imshow(mask_display, cmap='gray')
+        axes[1].set_title('Mask (Black=Ignore/Padding)')
+        axes[1].axis('off')
+        
+        # 3. 显示图像并叠加边界框
+        axes[2].imshow(img_np)
+        
+        # 绘制边界框，使用原始图像尺寸
+        for box in boxes:
+            # 将归一化的坐标转换回像素坐标，使用原始尺寸
+            cx, cy, w, h = box * torch.tensor([orig_width, orig_height, orig_width, orig_height])
+            x1, y1 = cx - w/2, cy - h/2
+            
+            # 创建Rectangle patch
+            rect = patches.Rectangle((x1, y1), w, h, linewidth=2, edgecolor='r', facecolor='none')
+            axes[2].add_patch(rect)
+        
+        axes[2].set_title('Image with Bounding Boxes')
+        axes[2].axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+    
+    # 获取一个批次
+    batch_iter = iter(dataloader)
+    batch = next(batch_iter)
+    
+    # 可视化第一个批次中的前两个样本
+    for i in range(len(batch['images'])):
+        visualize_padding_and_mask(batch, sample_idx=i)
+    
