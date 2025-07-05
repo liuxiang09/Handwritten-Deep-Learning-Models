@@ -1,22 +1,55 @@
-"""
-SAM（Segment Anything Model）图像编码器
+import torch
+import torch.nn as nn
+import timm
+from typing import Type
+from .common import LayerNorm2d
+from torchinfo import summary
 
-此模块实现SAM的图像编码器组件，负责将输入图像编码为特征表示。
-图像编码器通常基于视觉Transformer（ViT）架构，处理图像块。
 
-主要功能：
-- 图像预处理和块嵌入
-- 多头自注意力层
-- 位置编码
-- 下游任务的特征提取
+class ImageEncoderViT(nn.Module):
+    def __init__(self,
+                 model_name: str = 'vit_base_patch16_224',
+                 image_size: int = 1024,
+                 embed_dim: int = 768,
+                 output_channels: int = 256,
+                 norm_layer: Type[nn.Module] = LayerNorm2d):
+        """
+        Args:
+            model_name (str): model name from timm library, e.g., 'vit_base_patch16_224', 'vit_large_patch16_224', 'vit_huge_patch14_224'.
+            image_size (int): input image size (assumed to be square).
+            embed_dim (int): ViT embedding dimension. 'vit_base' is 768, 'vit_large' is 1024, 'vit_huge' is 1280.
+            output_channels (int): number of output channels in the final feature map.
+            norm_layer (Type[nn.Module]): normalization layer to use.
+        """
+        super().__init__()
+        self.image_size = image_size
+        # ===== Load pretrained ViT model from timm =====
+        self.vit = timm.create_model(
+            model_name, 
+            pretrained=True, 
+            num_classes=0,
+            img_size=self.image_size)
+        self.patch_size = self.vit.patch_embed.patch_size[0]
 
-参考文献：
-- 论文："Segment Anything" by Kirillov et al.
-- 图像编码器生成密集特征图，作为掩码解码器的输入
-"""
+        # ===== Define SAM specific Neck structure =====
+        self.neck = nn.Sequential(
+            nn.Conv2d(embed_dim, output_channels, kernel_size=1, bias=False),
+            norm_layer(output_channels),
+            nn.Conv2d(output_channels, output_channels, kernel_size=3, padding=1, bias=False),
+            norm_layer(output_channels),
+        )
 
-# TODO: 实现基于ViT的图像编码器
-# TODO: 添加块嵌入层
-# TODO: 实现transformer块
-# TODO: 添加位置编码
-# TODO: 实现特征金字塔网络（如需要）
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: input tensor of shape (B, C, H, W)
+        """
+        features = self.vit.forward_features(x) # x shape: (B, num_patches+1, embed_dim)
+        # reshape features to (B, embed_dim, H_feat, W_feat)
+        B, num_patches, embed_dim = features.shape
+        H_feat = W_feat = self.image_size // self.patch_size
+        features = features[:, 1:, :].permute(0, 2, 1).reshape(B, embed_dim, H_feat, W_feat)  # (B, embed_dim, H_feat, W_feat)
+        # pass through Neck structure
+        image_embedding = self.neck(features)  # (B, output_channels, H_feat, W_feat)
+
+        return image_embedding
