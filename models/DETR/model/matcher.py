@@ -12,9 +12,9 @@ class HungarianMatcher(nn.Module):
     匹配的依据是类别预测的置信度和边界框的相似度。
     """
     def __init__(self, 
-                 cost_class: float = 1.0, 
-                 cost_L1: float = 5.0, 
-                 cost_giou: float = 2.0):
+                 cost_class: float, 
+                 cost_L1: float, 
+                 cost_giou: float):
         """
         初始化匈牙利匹配器。
         Args:

@@ -67,13 +67,19 @@ python models/DETR/TEST/test_detr.py
 #### 训练模型
 
 ```bash
-python models/DETR/train.py --train --eval --data_dir data/Pascal_VOC/VOC2012_train_val/VOC2012_train_val --save_dir models/DETR/checkpoints --num_epochs 10
+python models/DETR/train.py
 ```
 
 ### 3. 评估模型
 
 ```bash
-python models/DETR/eval.py --checkpoint checkpoints/best_model.pth --data_dir data/Pascal_VOC/VOC2012_test/VOC2012_test --confidence_threshold 0.5 --num_samples 10
+python models/DETR/eval.py
+```
+
+### 4. 可视化预测结果
+
+```bash
+python models/DETR/inference.py
 ```
 
 评估脚本会：
@@ -81,24 +87,15 @@ python models/DETR/eval.py --checkpoint checkpoints/best_model.pth --data_dir da
 - 在验证集上运行模型
 - 生成检测结果的可视化图像
 - 计算平均检测数量等统计信息
-- 将结果保存到 `eval_results/` 目录
+- 将结果保存到 `results/` 目录
 
 ### 4. 恢复训练
 
 ```bash
-python models/DETR/train.py --train --resume models/DETR/checkpoints/checkpoint_epoch_10.pth --num_epochs 50
+python models/DETR/train.py --resume models/DETR/checkpoints/checkpoint_epoch_10.pth --num_epochs 50
 ```
 
 ## 训练监控
-
-### 日志文件
-
-训练日志保存在 `logs/` 目录中，包含：
-
-- 每个 epoch 的平均损失
-- 详细的损失组成（分类损失、边界框损失、GIoU 损失）
-- 学习率变化
-- 训练时间统计
 
 ### 检查点文件
 

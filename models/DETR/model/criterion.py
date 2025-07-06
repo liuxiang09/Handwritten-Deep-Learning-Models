@@ -30,6 +30,7 @@ class SetCriterion(nn.Module):
         background_weight[-1] = eos_coef  # 最后一类是背景类
         self.register_buffer("background_weight", background_weight)
 
+
     def forward(self,
                 outputs: Dict[str, torch.Tensor],
                 targets: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
@@ -37,10 +38,10 @@ class SetCriterion(nn.Module):
         Args:
             outputs: 模型的输出，包含:
                 - "pred_labels": [B, num_queries, num_classes + 1]
-                - "pred_boxes": [B, num_queries, 4]
+                - "pred_boxes": [B, num_queries, 4](cx, cy, w, h) 且已归一化到[0, 1]
             targets: 真实标签列表，每个元素是一个字典，包含:
                 - "labels": [num_boxes]
-                - "boxes": [num_boxes, 4]
+                - "boxes": [num_boxes, 4](x_min, y_min, x_max, y_max) 且未归一化
 
         Returns:
             dict: 包含损失值的字典
@@ -49,7 +50,8 @@ class SetCriterion(nn.Module):
         indices = self.matcher(outputs, targets)
 
         # ===== 计算损失 =====
-        num_batches = len(targets)
+        num_total_boxes = sum(len(t["boxes"]) for t in targets)
+
         losses = {}
         loss_ce = 0.0
         loss_bbox = 0.0
@@ -61,26 +63,29 @@ class SetCriterion(nn.Module):
             target = targets[i]
 
             # 计算类别损失
-            if len(matched_target_idx) > 0:
-                matched_pred_labels = pred_labels[matched_pred_idx]
-                matched_target_labels = target["labels"][matched_target_idx]
-                loss_ce += F.cross_entropy(matched_pred_labels, matched_target_labels, weight=self.background_weight)
+            target_labels = torch.full((pred_labels.shape[0],), self.num_classes, dtype=torch.int64, device=pred_labels.device)
+            target_labels[matched_pred_idx] = target["labels"][matched_target_idx]
+            loss_ce += F.cross_entropy(pred_labels, target_labels, weight=self.background_weight)
+            loss_ce_test = F.cross_entropy(pred_labels, target_labels)
 
             # 计算边界框损失
             if len(matched_target_idx) > 0:
                 matched_pred_boxes = pred_boxes[matched_pred_idx]
                 matched_target_boxes = target["boxes"][matched_target_idx]
-                loss_bbox += F.l1_loss(matched_pred_boxes, matched_target_boxes, reduction="none").sum(-1).mean()
+                loss_bbox += F.l1_loss(matched_pred_boxes, matched_target_boxes, reduction="sum")
 
             # 计算GIoU损失
             if len(matched_target_idx) > 0:
                 matched_pred_boxes = pred_boxes[matched_pred_idx]
                 matched_target_boxes = target["boxes"][matched_target_idx]
-                loss_giou += (1 - generalized_box_iou(cxcywh_to_xyxy(matched_pred_boxes), cxcywh_to_xyxy(matched_target_boxes))).mean()
+                giou = generalized_box_iou(
+                    cxcywh_to_xyxy(matched_pred_boxes), 
+                    cxcywh_to_xyxy(matched_target_boxes))
+                loss_giou += (1 - torch.diag(giou)).sum()
 
         losses = {
-            "loss_ce": loss_ce * self.weight_dict.get("loss_ce", 1.0) / num_batches,
-            "loss_bbox": loss_bbox * self.weight_dict.get("loss_bbox", 1.0) / num_batches,
-            "loss_giou": loss_giou * self.weight_dict.get("loss_giou", 1.0) / num_batches,
+            "loss_ce": loss_ce * self.weight_dict.get("loss_ce", 1.0) / len(targets),
+            "loss_bbox": loss_bbox * self.weight_dict.get("loss_bbox", 1.0) / num_total_boxes,
+            "loss_giou": loss_giou * self.weight_dict.get("loss_giou", 1.0) / num_total_boxes,
         }
         return losses

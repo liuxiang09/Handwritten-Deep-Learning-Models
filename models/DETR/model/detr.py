@@ -47,7 +47,9 @@ class DETR(nn.Module):
         # 预测头
         self.class_head = nn.Linear(hidden_dim, num_classes + 1)  # +1表示"无目标"类别
         self.bbox_head = MLP(hidden_dim, hidden_dim, 4, 3)  # 预测归一化的边界框坐标(cx,cy,w,h)
-        
+        nn.init.constant_(self.class_head.bias, -4.0)  # 初始化类别预测头偏置
+        nn.init.constant_(self.bbox_head.layers[-1].weight.data, 0)
+        nn.init.constant_(self.bbox_head.layers[-1].bias.data, 0)
         # 可学习的对象查询
         self.query_embed = nn.Embedding(num_queries, hidden_dim) # [100, hidden_dim]
         

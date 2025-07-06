@@ -26,7 +26,7 @@ def collate_fn(batch):
     masks = []
     targets = []
 
-    for image in images:
+    for i, image in enumerate(images):
         c, h, w = image.shape
 
         padding = (0, max_width - image.shape[2], 0, max_height - image.shape[1])
@@ -39,28 +39,35 @@ def collate_fn(batch):
         mask[:, w:] = True  # 填充区域
         masks.append(mask)
 
-    images_tensor = torch.stack(padded_images)
-    masks_tensor = torch.stack(masks)
+        if boxes[i].shape[0] > 0:
+            cx = (boxes[i][:, 0] + boxes[i][:, 2]) / 2
+            cy = (boxes[i][:, 1] + boxes[i][:, 3]) / 2
+            box_w = boxes[i][:, 2] - boxes[i][:, 0]
+            box_h = boxes[i][:, 3] - boxes[i][:, 1]
+            cx = cx / w  # 归一化到[0, 1]
+            cy = cy / h  # 归一化到[0, 1]
+            box_w = box_w / w  # 归一化到[0, 1]
+            box_h = box_h / h  # 归一化到[0, 1]
+            boxes[i][:, 0] = cx
+            boxes[i][:, 1] = cy
+            boxes[i][:, 2] = box_w
+            boxes[i][:, 3] = box_h
+
+    padded_images = torch.stack(padded_images)
+    masks = torch.stack(masks)
     
     # 处理目标框和标签
     for i, (box, label) in enumerate(zip(boxes, labels)):
-        # 获取对应图像的原始尺寸
-        orig_h, orig_w = images[i].shape[1], images[i].shape[2] # [C, H, W]
-        
-        # 归一化box坐标 (x1, y1, x2, y2) -> (0, 1)
-        normalized_boxes = box.clone()
-        normalized_boxes[:, [0, 2]] /= orig_w  # 归一化x坐标
-        normalized_boxes[:, [1, 3]] /= orig_h  # 归一化y坐标
-        
+        # 直接使用原始尺寸的边界框，不进行归一化
         target = {
-            'boxes': normalized_boxes,
+            'boxes': box,
             'labels': label
         }
         targets.append(target)
 
     return {
-        'images': images_tensor, # [B, C, H, W]
-        'masks': masks_tensor, # [B, H, W]
+        'images': padded_images, # [B, C, H, W]
+        'masks': masks, # [B, H, W]
         'targets': targets # List -> 每个元素是一个字典，包含 'boxes' 和 'labels'
     }
 
@@ -100,14 +107,9 @@ class PascalVOCDataset(Dataset):
                 y1 = float(bbox.find('ymin').text)
                 x2 = float(bbox.find('xmax').text)
                 y2 = float(bbox.find('ymax').text)
-                
-                # 转换为cx, cy, w, h格式
-                cx = (x1 + x2) / 2
-                cy = (y1 + y2) / 2
-                w = x2 - x1
-                h = y2 - y1
-                boxes.append([cx, cy, w, h])
-        
+
+                boxes.append([x1, y1, x2, y2])
+
         return torch.tensor(boxes, dtype=torch.float32), torch.tensor(labels, dtype=torch.int64)
     
     def __getitem__(self, idx: int):
@@ -134,18 +136,21 @@ if __name__ == "__main__":
     data_dir = "./data/Pascal_VOC/VOC2012_train_val/VOC2012_train_val"
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        # transforms.RandomHorizontalFlip(0.5),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        
+        # transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
     ])
     
     dataset = PascalVOCDataset(data_dir=data_dir, split='train', transform=transform)
     print(f"数据集大小: {len(dataset)}")
     
-    # for i in range(4):  # 打印前5个样本的信息
-    #     sample = dataset[i]
-    #     print(f"\n第{i+1}个样本:")
-    #     print(f"图片形状: {sample['image'].shape}")
-    #     print(f"标注框: {sample['boxes']}")
-    #     print(f"类别: {sample['labels']}")
+    for i in range(4):  # 打印前5个样本的信息
+        sample = dataset[i]
+        print(f"\n第{i+1}个样本:")
+        print(f"图片形状: {sample['image'].shape}")
+        print(f"标注框: {sample['boxes']}")
+        print(f"类别: {sample['labels']}")
 
     dataloader = torch.utils.data.DataLoader(
         dataset,
@@ -155,14 +160,14 @@ if __name__ == "__main__":
         num_workers=2
     )
 
-    # for idx, batch in enumerate(dataloader):
-    #     if idx < 5:
-    #         print(f"\n第{idx+1}个批次:")
-    #         print(f"图片形状: {batch['images'].shape}")
-    #         print(f"标注框: {batch['targets']}")
-    #         print(f"掩码形状: {batch['masks'].shape}")
-    #     else:
-    #         break
+    for idx, batch in enumerate(dataloader):
+        if idx < 5:
+            print(f"\n第{idx+1}个批次:")
+            print(f"图片形状: {batch['images'].shape}")
+            print(f"标注框: {batch['targets']}")
+            print(f"掩码形状: {batch['masks'].shape}")
+        else:
+            break
 
     print("数据加载器测试完成。")
     
@@ -217,14 +222,23 @@ if __name__ == "__main__":
         # 3. 显示图像并叠加边界框
         axes[2].imshow(img_np)
         
-        # 绘制边界框，使用原始图像尺寸
+        # 绘制边界框，处理归一化的(cx,cy,w,h)格式
         for box in boxes:
-            # 将归一化的坐标转换回像素坐标，使用原始尺寸
-            cx, cy, w, h = box * torch.tensor([orig_width, orig_height, orig_width, orig_height])
-            x1, y1 = cx - w/2, cy - h/2
+            # 获取归一化的中心点和宽高
+            cx, cy, w, h = box
+            
+            # 将归一化坐标转换回像素坐标，使用原始图像尺寸
+            cx_pixel = cx * orig_width
+            cy_pixel = cy * orig_height
+            w_pixel = w * orig_width
+            h_pixel = h * orig_height
+            
+            # 计算左上角坐标
+            x1 = cx_pixel - w_pixel/2
+            y1 = cy_pixel - h_pixel/2
             
             # 创建Rectangle patch
-            rect = patches.Rectangle((x1, y1), w, h, linewidth=2, edgecolor='r', facecolor='none')
+            rect = patches.Rectangle((x1, y1), w_pixel, h_pixel, linewidth=2, edgecolor='r', facecolor='none')
             axes[2].add_patch(rect)
         
         axes[2].set_title('Image with Bounding Boxes')

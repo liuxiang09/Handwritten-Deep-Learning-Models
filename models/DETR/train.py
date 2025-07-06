@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 import torchvision.transforms as transforms
 import os
 import argparse
 from tqdm import tqdm
 import time
 from pathlib import Path
-
+from transformers import get_cosine_schedule_with_warmup
 # 导入DETR模型相关模块
 from models.DETR.model import DETR, Backbone, Transformer, HungarianMatcher, SetCriterion
 from models.DETR.utils import PascalVOCDataset, collate_fn, train_one_epoch, evaluate
@@ -22,17 +22,17 @@ def parse_args():
     parser.add_argument("--data_dir", type=str, default="./data/Pascal_VOC/VOC2012_train_val/VOC2012_train_val")
     parser.add_argument("--save_dir", type=str, default="./models/DETR/checkpoints")
     parser.add_argument("--log_dir", type=str, default="./models/DETR/logs")
-    parser.add_argument("--resume", type=str, default="", help="检查点路径，用于恢复训练")
+    parser.add_argument("--resume", type=str, default="./models/DETR/logs/checkpoint_epoch_50.pth", help="检查点路径，用于恢复训练")
 
     # 训练相关参数
     parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--num_epochs", type=int, default=10)
+    parser.add_argument("--num_epochs", type=int, default=300)
     parser.add_argument("--learning_rate", type=float, default=1e-4)
     parser.add_argument("--weight_decay", type=float, default=1e-4)
     parser.add_argument("--num_workers", type=int, default=4)
     
     # 模型相关参数
-    parser.add_argument("--num_queries", type=int, default=100)
+    parser.add_argument("--num_queries", type=int, default=25)
     parser.add_argument("--num_classes", type=int, default=20)
     parser.add_argument("--hidden_dim", type=int, default=256)
     parser.add_argument("--nheads", type=int, default=8)
@@ -41,20 +41,20 @@ def parse_args():
     parser.add_argument("--dropout", type=float, default=0.1)
     
     # 损失相关参数
-    parser.add_argument("--cost_class", type=float, default=1.0)
-    parser.add_argument("--cost_L1", type=float, default=5.0)
-    parser.add_argument("--cost_giou", type=float, default=2.0)
+    parser.add_argument("--cost_class", type=float, default=2.0)
+    parser.add_argument("--cost_L1", type=float, default=0.25)
+    parser.add_argument("--cost_giou", type=float, default=1.0)
     parser.add_argument("--loss_ce", type=float, default=1.0)
-    parser.add_argument("--loss_bbox", type=float, default=5.0)
-    parser.add_argument("--loss_giou", type=float, default=2.0)
-    parser.add_argument("--eos_coef", type=float, default=0.1)
+    parser.add_argument("--loss_bbox", type=float, default=4.0)
+    parser.add_argument("--loss_giou", type=float, default=3.0)
+    parser.add_argument("--eos_coef", type=float, default=0.1, help="背景类的权重系数，降低背景类的影响力")
     
     # 其他参数
-    parser.add_argument("--train", action="store_true", help="训练模式")
-    parser.add_argument("--eval", action="store_true", help="训练时进行验证")
-    parser.add_argument("--save_epochs", type=int, default=1)
-    parser.add_argument("--print_steps", type=int, default=50)
-    parser.add_argument("--max_size", type=int, default=800)
+    parser.add_argument("--train", default=True, help="训练模式")
+    parser.add_argument("--eval", default=True, help="训练时进行验证")
+    parser.add_argument("--save_epochs", type=int, default=10)
+    parser.add_argument("--eval_epochs", type=int, default=5, help="每隔多少个epoch进行一次评估")
+    parser.add_argument("--lr_epochs", type=int, default=10, help="学习率衰减步长")
     
     return parser.parse_args()
 
@@ -105,7 +105,7 @@ def build_criterion(args):
     
     return criterion
 
-def save_checkpoint(model, optimizer, epoch, loss, save_path):
+def save_checkpoint(model, optimizer, epoch, loss, save_path, best_loss=None):
     """保存检查点"""
     print("=====> 正在保存检查点...")
     checkpoint = {
@@ -114,26 +114,11 @@ def save_checkpoint(model, optimizer, epoch, loss, save_path):
         'optimizer_state_dict': optimizer.state_dict(),
         'loss': loss,
     }
+
+    # 如果提供了best_loss，也保存它
+    if best_loss is not None:
+        checkpoint['best_loss'] = best_loss
     torch.save(checkpoint, save_path)
-
-
-def load_model_for_eval(model, model_path):
-    """加载模型用于评估"""
-    print(f"=====> 正在加载模型: {model_path}")
-    checkpoint = torch.load(model_path, map_location='cpu')
-    
-    # 处理不同的保存格式
-    if 'model_state_dict' in checkpoint:
-        model.load_state_dict(checkpoint['model_state_dict'])
-        epoch = checkpoint.get('epoch', 0)
-        loss = checkpoint.get('loss', 0.0)
-        print(f"=====> 模型加载成功 (Epoch: {epoch}, Loss: {loss:.4f})")
-    else:
-        # 如果直接保存的是模型参数
-        model.load_state_dict(checkpoint)
-        print("=====> 模型参数加载成功")
-    
-    return model
 
 
 def load_checkpoint(model, optimizer, checkpoint_path):
@@ -144,7 +129,9 @@ def load_checkpoint(model, optimizer, checkpoint_path):
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
     loss = checkpoint['loss']
-    return epoch, loss
+
+    best_loss = checkpoint.get('best_loss', float('inf'))
+    return epoch, loss, best_loss
 
 
 def main():
@@ -159,7 +146,7 @@ def main():
     
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
     # 训练数据集
@@ -169,7 +156,7 @@ def main():
             split='train',
             transform=transform
         )
-
+        train_dataset_subset = Subset(train_dataset, list(range(0, args.batch_size)))  # 仅使用前几个样本
         train_loader = DataLoader(
             train_dataset,
             batch_size=args.batch_size,
@@ -215,8 +202,15 @@ def main():
     optimizer = optim.AdamW(param_dicts, lr=args.learning_rate, weight_decay=args.weight_decay)
     
     # 学习率调度器
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
-    
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_epochs, gamma=0.1)
+    num_training_steps = args.num_epochs * len(train_loader)
+    num_warmup_steps = int(num_training_steps * 0.1)
+    scheduler = get_cosine_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=num_warmup_steps,
+        num_training_steps=num_training_steps
+    )
+
     start_epoch = 0
     best_loss = float('inf')
     
@@ -224,7 +218,7 @@ def main():
 
     if args.resume and os.path.exists(args.resume):
         print(f"Resuming training from {args.resume}")
-        start_epoch, _ = load_checkpoint(model, optimizer, args.resume)
+        start_epoch, loss, best_loss = load_checkpoint(model, optimizer, args.resume)
         start_epoch += 1
         
     # 训练循环
@@ -232,28 +226,23 @@ def main():
         print("Starting training...")
         for epoch in range(start_epoch, args.num_epochs):
             # 训练
-            train_loss = train_one_epoch(args, model, criterion, train_loader, optimizer, device, epoch)
+            train_loss = train_one_epoch(args, model, criterion, train_loader, optimizer, scheduler, device, epoch)
 
-            # 更新学习率
-            scheduler.step()
-            current_lr = optimizer.param_groups[0]['lr']
-            print(f"Learning rate: {current_lr:.6f}")
-            
             # 验证
-            if args.eval:
+            if args.eval and (epoch + 1) % args.eval_epochs == 0:
                 val_loss = evaluate(model, criterion, val_loader, device)
                 
                 # 保存最佳模型
                 if val_loss < best_loss:
                     best_loss = val_loss
                     best_model_path = os.path.join(args.save_dir, f'best_model_epoch_{epoch+1}.pth')
-                    save_checkpoint(model, optimizer, epoch, val_loss, best_model_path)
+                    save_checkpoint(model, optimizer, epoch, val_loss, best_model_path, best_loss=best_loss)
                     print(f"Best model saved to {best_model_path}")
             
             # 定期保存检查点
             if (epoch + 1) % args.save_epochs == 0:
                 checkpoint_path = os.path.join(args.log_dir, f'checkpoint_epoch_{epoch+1}.pth')
-                save_checkpoint(model, optimizer, epoch, train_loss, checkpoint_path)
+                save_checkpoint(model, optimizer, epoch, train_loss, checkpoint_path, best_loss=best_loss)
                 print(f"Checkpoint saved to {checkpoint_path}")
         
         print("Training completed!")

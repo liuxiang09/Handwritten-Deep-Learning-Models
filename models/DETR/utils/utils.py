@@ -35,12 +35,15 @@ class NestedTensor(object):
     
 def cxcywh_to_xyxy(x: Tensor) -> Tensor:
     """
-    [cx, cy, w, h] -> [x1, y1, x2, y2]
+    转换中心点-宽高格式的边界框 [cx, cy, w, h] 到左上右下角点格式 [x1, y1, x2, y2]
+    这个函数假设输入的坐标已经归一化到[0,1]范围内
     """
     x_c, y_c, w, h = x.unbind(-1)
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
          (x_c + 0.5 * w), (y_c + 0.5 * h)]
-    return torch.stack(b, dim=-1)
+    # 确保坐标在[0,1]范围内
+    result = torch.stack(b, dim=-1)
+    return torch.clamp(result, min=0.0, max=1.0)
 
 def xyxy_to_cxcywh(x: Tensor) -> Tensor:
     """
