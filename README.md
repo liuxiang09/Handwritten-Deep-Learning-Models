@@ -55,10 +55,8 @@ PyTorch/
 │   ├── DETR/...
 │   └── SAM/...
 ├── TEST/
-│   ├── test_AutoTokenizer.py
-│   ├── test_dataset.py
 │   ├── test_GPU.py
-│   └── ...
+│   └── test_package.py
 │
 ├── .gitignore
 ├── README.md
@@ -117,10 +115,10 @@ PyTorch/
   </tr>
   <tr>
     <td><strong>6. SAM</strong></td>
-    <td>🚧 计划中</td>
+    <td>⚙️ 进行中</td>
     <td>2023</td>
     <td>通用图像分割</td>
-    <td>待定(SA-1B)</td>
+    <td>Pascal VOC 2012</td>
   </tr>
 </table>
 
@@ -205,10 +203,10 @@ PyTorch/
 <details>
 <summary>查看详情</summary>
 
-- **实现状态:** 🚧 计划中
+- **实现状态:** ⚙️ 进行中
 - **发表时间:** 2023 年 4 月
 - **主要功能:** 通用图像分割
-- **数据集:** 待定(SA-1B)
+- **数据集:** Pascal VOC 2012
 - **简要说明:** SAM 是一个强大的通用分割基础模型，支持点击、框、文本等多种交互式提示，具备出色的零样本泛化能力，能够实时生成高质量的分割掩码。
 - **当前进度:** 暂无
 </details>

@@ -1,0 +1,12 @@
+# 正确的配置
+
+[project]
+name = "Handwritten-Deep-Learning-Models"
+version = "0.1.0"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["models", "TEST"]

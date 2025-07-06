@@ -1,0 +1,16 @@
+LICENSE
+README.md
+pyproject.toml
+Handwritten_Deep_Learning_Models.egg-info/PKG-INFO
+Handwritten_Deep_Learning_Models.egg-info/SOURCES.txt
+Handwritten_Deep_Learning_Models.egg-info/dependency_links.txt
+Handwritten_Deep_Learning_Models.egg-info/top_level.txt
+TEST/test_AutoTokenizer.py
+TEST/test_GPU.py
+TEST/test_dataset.py
+TEST/test_package.py
+TEST/test_tensorboard.py
+TEST/test_torchvision_datasets.py
+TEST/test_train.py
+TEST/test_transforms.py
+TEST/test_vision_encoder.py
