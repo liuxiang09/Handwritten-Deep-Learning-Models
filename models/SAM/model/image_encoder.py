@@ -43,6 +43,8 @@ class ImageEncoderViT(nn.Module):
         """
         Args:
             x: input tensor of shape (B, C, H, W)
+        Returns:
+            image_embedding: output tensor of shape (B, output_channels, H_feat, W_feat)
         """
         features = self.vit.forward_features(x) # x shape: (B, num_patches+1, embed_dim)
         # reshape features to (B, embed_dim, H_feat, W_feat)
