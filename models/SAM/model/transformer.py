@@ -8,8 +8,7 @@ from .common import MLPBlock
 
 class Attention(nn.Module):
     """
-    An attention layer that allows for downscaling the size of the embedding
-    after projection to queries, keys, and values.
+    一个注意力层，允许在投影到查询、键和值后对嵌入大小进行下采样。
     """
     def __init__(self,
                  embedding_dim: int,
@@ -30,10 +29,10 @@ class Attention(nn.Module):
     def _separate_heads(self, x: Tensor, num_heads: int) -> Tensor:
         """
         Args:
-            x: Input tensor of shape (B, num_tokens, internal_dim)
-            num_heads: Number of attention heads.
+            x: 形状为(B, num_tokens, internal_dim)的输入张量
+            num_heads: 注意力头数。
         Returns:
-            Tensor of shape (B, num_heads, num_tokens, internal_dim // num_heads)
+            形状为(B, num_heads, num_tokens, internal_dim // num_heads)的张量
         """
         bs, n_head, dim = x.shape
         assert dim % num_heads == 0, f"dim {dim} must be divisible by num_heads {num_heads}"
@@ -44,30 +43,30 @@ class Attention(nn.Module):
     def _recombine_heads(self, x: Tensor) -> Tensor:
         """
         Args:
-            x: Input tensor of shape (B, num_heads, num_tokens, internal_dim // num_heads)
+            x: 形状为(B, num_heads, num_tokens, internal_dim // num_heads)的输入张量
         Returns:
-            Tensor of shape (B, num_tokens, internal_dim)
+            形状为(B, num_tokens, internal_dim)的张量
         """
         bs, n_head, n_token, dim = x.shape
         return x.transpose(1, 2).reshape(bs, n_token, n_head * dim)
 
     def forward(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
-        # Input Projections
+        # 输入投影
         q = self.q_proj(q)
         k = self.k_proj(k)
         v = self.v_proj(v)
 
-        # Seperate heads
+        # 分离头
         q = self._separate_heads(q, self.num_heads) # [B, num_heads, num_tokens, internal_dim // num_heads]
         k = self._separate_heads(k, self.num_heads) # [B, num_heads, num_tokens, internal_dim // num_heads]
         v = self._separate_heads(v, self.num_heads) # [B, num_heads, num_tokens, internal_dim // num_heads]
 
-        # Attention
+        # 注意力
         dim_per_head = q.shape[-1]
         attn = q @ k.permute(0, 1, 3, 2) / math.sqrt(dim_per_head) # [B, num_heads, num_tokens, num_tokens]
         attn = attn.softmax(dim=-1)
 
-        # Get output
+        # 获取输出
         out = attn @ v # [B, num_heads, num_tokens, internal_dim // num_heads]
         out = self._recombine_heads(out)
         out = self.out_proj(out)
@@ -82,20 +81,17 @@ class TwoWayAttentionBlock(nn.Module):
                  attention_downsample_rate: int = 2,
                  skip_first_layer_pe: bool = False):
         """
-        A transformer block with four layers: (1) self-attention of sparse
-        inputs, (2) cross attention of sparse inputs to dense inputs, (3) mlp
-        block on sparse inputs, and (4) cross attention of dense inputs to sparse
-        inputs.
+        具有四层的Transformer块：(1)稀疏输入的自注意力，(2)稀疏输入到密集输入的交叉注意力，
+        (3)稀疏输入的MLP块，(4)密集输入到稀疏输入的交叉注意力。
 
         Arguments:
-          embedding_dim (int): the channel dimension of the embeddings
-          num_heads (int): the number of heads in the attention layers
-          mlp_dim (int): the hidden dimension of the mlp block
-          activation (nn.Module): the activation of the mlp block
-          attention_downsample_rate (int): the downsample rate of the attention
-            layers, e.g., 2 means that the attention layer will downsample the
-            input by a factor of 2.
-          skip_first_layer_pe (bool): skip the PE on the first layer
+          embedding_dim (int): 嵌入的通道维度
+          num_heads (int): 注意力层中的头数
+          mlp_dim (int): MLP块的隐藏维度
+          activation (nn.Module): MLP块的激活函数
+          attention_downsample_rate (int): 注意力层的下采样率，
+            例如，2表示注意力层将输入下采样2倍。
+          skip_first_layer_pe (bool): 跳过第一层的PE
         """
         super().__init__()
         self.skip_first_layer_pe = skip_first_layer_pe
@@ -123,36 +119,36 @@ class TwoWayAttentionBlock(nn.Module):
                 key_pe: Tensor) -> Tuple[Tensor, Tensor]:
         """
         Args:
-            queries: Input tensor of shape (B, num_queries, embedding_dim)
-            keys: Input tensor of shape (B, num_keys, embedding_dim)
-            query_pe: Positional encoding for queries of shape (B, num_queries, embedding_dim)
-            key_pe: Positional encoding for keys of shape (B, num_keys, embedding_dim)
+            queries: 形状为(B, num_queries, embedding_dim)的输入张量
+            keys: 形状为(B, num_keys, embedding_dim)的输入张量
+            query_pe: 查询的位置编码，形状为(B, num_queries, embedding_dim)
+            key_pe: 键的位置编码，形状为(B, num_keys, embedding_dim)
         """
-        # Self attention block
+        # 自注意力块
         if self.skip_first_layer_pe:
             queries = self.self_attn(queries, queries, queries)
         else:
             self_attn_out = self.self_attn(queries + query_pe, queries + query_pe, queries)
-            queries = self_attn_out + queries # residual connection
+            queries = self_attn_out + queries # 残差连接
         queries = self.norm1(queries)
 
-        # Cross attention block, tokens attending to image embedding
+        # 交叉注意力块，令牌关注图像嵌入
         q = queries + query_pe
         k = keys + key_pe
         attn_out = self.cross_attn_token_to_image(q, k, keys)
-        queries = attn_out + queries # residual connection
+        queries = attn_out + queries # 残差连接
         queries = self.norm2(queries)
 
-        # MLP block
+        # MLP块
         mlp_out = self.mlp(queries)
         queries = mlp_out + queries
         queries = self.norm3(queries)
 
-        # Cross attention block, image embedding attending to tokens
+        # 交叉注意力块，图像嵌入关注令牌
         q = queries + query_pe
         k = keys + key_pe
         attn_out = self.cross_attn_image_to_token(k, q, queries)
-        keys = attn_out + keys  # residual connection
+        keys = attn_out + keys  # 残差连接
         keys = self.norm4(keys)
 
         return queries, keys
@@ -167,16 +163,14 @@ class TwoWayTransformer(nn.Module):
                  activation: Type[nn.Module] = nn.ReLU,
                  attention_downsample_rate: int = 2):
         """
-        A transformer decoder that attends to an input image using
-        queries whose positional embedding is supplied.
+        一个Transformer解码器，使用提供位置嵌入的查询来关注输入图像。
 
         Args:
-          depth (int): number of layers in the transformer
-          embedding_dim (int): the channel dimension for the input embeddings
-          num_heads (int): the number of heads for multihead attention. Must
-            divide embedding_dim
-          mlp_dim (int): the channel dimension internal to the MLP block
-          activation (nn.Module): the activation to use in the MLP block
+          depth (int): Transformer的层数
+          embedding_dim (int): 输入嵌入的通道维度
+          num_heads (int): 多头注意力的头数。必须能整除embedding_dim
+          mlp_dim (int): MLP块内部的通道维度
+          activation (nn.Module): MLP块中使用的激活函数
         """
         super().__init__()
         self.depth = depth
@@ -193,7 +187,7 @@ class TwoWayTransformer(nn.Module):
                     mlp_dim=self.mlp_dim,
                     activation=activation,
                     attention_downsample_rate=attention_downsample_rate,
-                    skip_first_layer_pe=(i == 0) # skip the first Block's first layer PE
+                    skip_first_layer_pe=(i == 0) # 跳过第一个块的第一层PE
                 )
             )
         
@@ -210,35 +204,35 @@ class TwoWayTransformer(nn.Module):
                 point_embedding: Tensor) -> Tuple[Tensor, Tensor]:
         """
         Args:
-          image_embedding (torch.Tensor): image to attend to. Should be shape
-            B x embedding_dim x h x w for any h and w.
-          image_pe (torch.Tensor): the positional encoding to add to the image. Must
-            have the same shape as image_embedding.
-          point_embedding (torch.Tensor): the embedding to add to the query points.
-            Must have shape B x N_points x embedding_dim for any N_points.
+          image_embedding (torch.Tensor): 要关注的图像。应为任意h和w的形状
+            B x embedding_dim x h x w。
+          image_pe (torch.Tensor): 要添加到图像的位置编码。必须
+            与image_embedding具有相同的形状。
+          point_embedding (torch.Tensor): 要添加到查询点的嵌入。
+            对于任意N_points，必须具有形状B x N_points x embedding_dim。
 
         Returns:
-          torch.Tensor: the processed point_embedding
-          torch.Tensor: the processed image_embedding
+          torch.Tensor: 处理后的point_embedding
+          torch.Tensor: 处理后的image_embedding
         """
         # [B, embedding_dim, h, w] -> [B, h*w, embedding_dim]
         bs, c, h, w = image_embedding.shape
         image_embedding = image_embedding.flatten(2).transpose(1, 2)  # (bs, h*w, c)
         image_pe = image_pe.flatten(2).transpose(1, 2)
 
-        # Prepare queries and keys
+        # 准备查询和键
         queries = point_embedding
         keys = image_embedding
         
-        # Apply transformer blocks and final layernorm
+        # 应用Transformer块和最终层归一化
         for layer in self.layers:
             queries, keys = layer(queries, keys, query_pe=point_embedding, key_pe=image_pe)
 
-        # Apply the final attention layer from the points to the image
+        # 从点到图像应用最终注意力层
         q = queries + point_embedding
         k = keys + image_pe
         attn_out = self.final_attn_token_to_image(q=q, k=k, v=keys)
-        queries = attn_out + queries  # residual connection
+        queries = attn_out + queries  # 残差连接
         queries = self.final_norm(queries)
 
-        return queries, keys  # queries are the processed point embeddings, keys are the processed image embeddings
+        return queries, keys  # queries是处理后的点嵌入，keys是处理后的图像嵌入

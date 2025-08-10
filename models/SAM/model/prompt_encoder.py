@@ -6,14 +6,14 @@ from .common import LayerNorm2d
 
 class PositionEmbeddingRandom(nn.Module):
     """
-    Positional encoding for 2D images, using random values.
+    用于2D图像的位置编码，使用随机值。
     """
     def __init__(self,
                  num_pos_feats: int = 128,
                  scale: float = 1.0):
         
         super().__init__()
-        # Sample a fixed, non-learned random matrix from a Gaussian distribution
+        # 从高斯分布中采样一个固定的、非学习的随机矩阵
         self.register_buffer(
             "positional_encoding_gaussian_matrix",
             scale * torch.randn((2, num_pos_feats)), # [2, num_pos_feats]
@@ -21,27 +21,27 @@ class PositionEmbeddingRandom(nn.Module):
 
     def _pe_encoding(self, coords: torch.Tensor) -> torch.Tensor:
         """
-        Positionally encode points that are normalized to [0,1].
+        对归一化到[0,1]的点进行位置编码。
         Args:
-            coords: (B, N, 2) or (H, W, 2) coordinates in [0, 1] range
+            coords: (B, N, 2) 或 (H, W, 2) 坐标，范围在[0, 1]
         Returns:
-            pe: (B, N, 2 * num_pos_feats) positional encoding
+            pe: (B, N, 2 * num_pos_feats) 位置编码
         """
-        coords = 2 * coords - 1 # normalize from [0, 1] to [-1, 1]
-        # use gaussian matrix to compute positional encoding
+        coords = 2 * coords - 1 # 从[0, 1]归一化到[-1, 1]
+        # 使用高斯矩阵计算位置编码
         coords = coords @ self.positional_encoding_gaussian_matrix # [B, N, 2] @ [2, num_pos_feats] -> [B, N, num_pos_feats]
-        coords = 2 * np.pi * coords  # scale the coordinates
-        # adopt a sinusoidal encoding scheme
+        coords = 2 * np.pi * coords  # 缩放坐标
+        # 采用正弦编码方案
         pe = torch.cat((coords.sin(), coords.cos()), dim=-1) # [B, N, 2 * num_pos_feats]
         return pe
     
     def forward(self, size: Tuple[int, int]) -> torch.Tensor:
         """
-        Generate positional encoding for a grid of the specified size.
+        为指定大小的网格生成位置编码。
         Args:
-            size: (H, W) size of the coordinates grid
+            size: (H, W) 坐标网格的大小
         Returns:
-            pe: (H, W, 2 * num_pos_feats) positional encoding
+            pe: (H, W, 2 * num_pos_feats) 位置编码
         """
         h, w = size
         device = self.positional_encoding_gaussian_matrix.device
@@ -60,18 +60,18 @@ class PositionEmbeddingRandom(nn.Module):
                             coords_input: torch.Tensor,
                             image_size: Tuple[int, int]) -> torch.Tensor:
         """
-        Positionally encode points that are not normalized to [0,1].
+        对未归一化到[0,1]的点进行位置编码。
         Args:
             coords_input: (B, N, 2)
-            image_size: (H, W) size of the image
+            image_size: (H, W) 图像的大小
         Returns:
-            pe: (B, N, 2 * num_pos_feats) positional encoding
+            pe: (B, N, 2 * num_pos_feats) 位置编码
         """
-        # normalize into [0, 1]
+        # 归一化到[0, 1]
         coords = coords_input.clone()
         H, W = image_size
-        coords[:, :, 0] = coords[:, :, 0] / W # normalize x
-        coords[:, :, 1] = coords[:, :, 1] / H # normalize y
+        coords[:, :, 0] = coords[:, :, 0] / W # 归一化x
+        coords[:, :, 1] = coords[:, :, 1] / H # 归一化y
         return self._pe_encoding(coords.to(torch.float)) # [B, N, 2 * num_pos_feats]
     
 class PromptEncoder(nn.Module):
@@ -83,14 +83,14 @@ class PromptEncoder(nn.Module):
                  mask_in_channels: int,
                  activation: Type[nn.Module] = nn.GELU):
         """
-        Encodes prompts for input to SAM's mask decoder.
+        对输入到SAM掩码解码器的提示进行编码。
 
         Args:
-          embed_dim (int): The prompts' embedding dimension
-          image_embedding_size (tuple(int, int)): The spatial size of the image embedding, as (H, W).
-          input_image_size (tuple(int, int)): The padded size of the image as input to the image encoder, as (H, W).
-          mask_in_chans (int): The number of hidden channels used for encoding input masks.
-          activation (nn.Module): The activation to use when encoding input masks
+          embed_dim (int): 提示的嵌入维度
+          image_embedding_size (tuple(int, int)): 图像嵌入的空间大小，格式为(H, W)。
+          input_image_size (tuple(int, int)): 输入到图像编码器的图像的填充大小，格式为(H, W)。
+          mask_in_chans (int): 用于编码输入掩码的隐藏通道数。
+          activation (nn.Module): 编码输入掩码时使用的激活函数
         """
         super().__init__()
         self.embed_dim = embed_dim
@@ -98,14 +98,14 @@ class PromptEncoder(nn.Module):
         self.input_image_size = input_image_size
         self.pe_layer = PositionEmbeddingRandom(num_pos_feats=embed_dim // 2)
 
-        self.num_point_embeddings = 4 # pos/neg point + 2 box corners
-        point_embeddings = [nn.Embedding(1, embed_dim) for _ in range(self.num_point_embeddings)] # Embedding weight shape: [1, embed_dim]
+        self.num_point_embeddings = 4 # 正/负点 + 2个框角点
+        point_embeddings = [nn.Embedding(1, embed_dim) for _ in range(self.num_point_embeddings)] # 嵌入权重形状: [1, embed_dim]
         self.point_embeddings = nn.ModuleList(point_embeddings)
         self.not_a_point_embed = nn.Embedding(1, embed_dim)
 
         self.mask_input_size = (4 * image_embedding_size[0], 4 * image_embedding_size[1]) # [4*embed_H, 4*embed_W]
-        # downscale mask input to match the image embedding size
-        # e.g., [4 * 64, 4 * 64] -> [64, 64], it's up to the image encoder's embedding size
+        # 下采样掩码输入以匹配图像嵌入大小
+        # 例如，[4 * 64, 4 * 64] -> [64, 64]，这取决于图像编码器的嵌入大小
         self.mask_downscaling = nn.Sequential(
             nn.Conv2d(1, mask_in_channels // 4, kernel_size=2, stride=2),
             LayerNorm2d(mask_in_channels // 4, eps=1e-6),
@@ -119,11 +119,11 @@ class PromptEncoder(nn.Module):
 
     def get_dense_pe(self) -> torch.Tensor:
         """
-        Returns the positional encoding used to encode point prompts,
-        applied to a dense set of points the shape of the image encoding.
+        返回用于编码点提示的位置编码，
+        应用于图像编码形状的密集点集。
 
         Returns:
-          torch.Tensor: Positional encoding with shape [1, 2*embed_dim, embed_H, embed_W]
+          torch.Tensor: 形状为[1, 2*embed_dim, embed_H, embed_W]的位置编码
         """
         return self.pe_layer.forward(self.image_embedding_size).unsqueeze(0)
         
@@ -132,15 +132,15 @@ class PromptEncoder(nn.Module):
                       labels: torch.Tensor,
                       pad: bool) -> torch.Tensor:
         """
-        Embeds point prompts.
+        嵌入点提示。
         Args:
-            points (torch.Tensor): Tensor of shape (B, N, 2) containing point coordinates.
-            labels (torch.Tensor): Tensor of shape (B, N) containing point labels.
-            pad (bool): Whether to pad the points and labels with a zero point and -1 label.
+            points (torch.Tensor): 形状为(B, N, 2)的张量，包含点坐标。
+            labels (torch.Tensor): 形状为(B, N)的张量，包含点标签。
+            pad (bool): 是否用零点和-1标签填充点和标签。
         Returns:
-            torch.Tensor: Embedded points of shape (B, N, embed_dim).
+            torch.Tensor: 形状为(B, N, embed_dim)的嵌入点。
         """
-        points = points + 0.5 # shift to center of pixel
+        points = points + 0.5 # 移动到像素中心
         if pad:
             padding_point = torch.zeros((points.shape[0], 1, 2), device=points.device)
             padding_label = -torch.ones((labels.shape[0], 1), device=labels.device)
@@ -155,26 +155,26 @@ class PromptEncoder(nn.Module):
     
     def _embed_boxes(self, boxes: torch.Tensor) -> torch.Tensor:
         """
-        Embeds box prompts.
+        嵌入框提示。
         Args:
-            boxes (torch.Tensor): Tensor of shape (B, N, 4) containing box coordinates.
+            boxes (torch.Tensor): 形状为(B, N, 4)的张量，包含框坐标。
         Returns:
-            torch.Tensor: Embedded boxes of shape (B * N, 2, embed_dim).
+            torch.Tensor: 形状为(B * N, 2, embed_dim)的嵌入框。
         """
-        boxes = boxes + 0.5 # Shift to center of pixel
+        boxes = boxes + 0.5 # 移动到像素中心
         coords = boxes.reshape(-1, 2, 2)  # [B * N, 2, 2]
         corner_embedding = self.pe_layer.forward_with_coords(coords, self.input_image_size)
-        corner_embedding[:, 0, :] += self.point_embeddings[2].weight # the left top corner
-        corner_embedding[:, 1, :] += self.point_embeddings[3].weight # the right bottom corner
+        corner_embedding[:, 0, :] += self.point_embeddings[2].weight # 左上角
+        corner_embedding[:, 1, :] += self.point_embeddings[3].weight # 右下角
         return corner_embedding
     
     def _embed_masks(self, masks: torch.Tensor) -> torch.Tensor:
         """
-        Embeds mask prompts.
+        嵌入掩码提示。
         Args:
-            masks (torch.Tensor): Tensor of shape (B, 1, 4*embed_H, 4*embed_W) containing binary masks.
+            masks (torch.Tensor): 形状为(B, 1, 4*embed_H, 4*embed_W)的张量，包含二进制掩码。
         Returns:
-            torch.Tensor: Embedded masks of shape (B, embed_dim, embed_H, embed_W).
+            torch.Tensor: 形状为(B, embed_dim, embed_H, embed_W)的嵌入掩码。
         """
         mask_embedding = self.mask_downscaling(masks)
         return mask_embedding
@@ -184,13 +184,13 @@ class PromptEncoder(nn.Module):
                         boxes: Optional[torch.Tensor],
                         masks: Optional[torch.Tensor]) -> int:
         """
-        Returns the batch size of the input tensors.
+        返回输入张量的批大小。
         Args:
-            points (Optional[Tuple[torch.Tensor, torch.Tensor]]): Point coordinates and labels.
-            boxes (Optional[torch.Tensor]): Box coordinates.
-            masks (Optional[torch.Tensor]): Mask tensors.
+            points (Optional[Tuple[torch.Tensor, torch.Tensor]]): 点坐标和标签。
+            boxes (Optional[torch.Tensor]): 框坐标。
+            masks (Optional[torch.Tensor]): 掩码张量。
         Returns:
-            int: Batch size.
+            int: 批大小。
         """
         if points is not None:
             return points[0].shape[0]
@@ -210,18 +210,18 @@ class PromptEncoder(nn.Module):
                 masks: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         
         """
-        Embeds different types of prompts, returning both sparse and dense embeddings.
+        嵌入不同类型的提示，返回稀疏和密集嵌入。
 
         Arguments:
-          points : point coordinates and labels to embed
-                    points shape [B, N, 2] and labels shape [B, N].
-          boxes : boxes to embed in the shape [B, N, 4].
-          masks : masks to embed in the shape [B, 1, 4*embed_H, 4*embed_W].
+          points : 要嵌入的点坐标和标签
+                    点形状[B, N, 2]，标签形状[B, N]。
+          boxes : 要嵌入的框，形状[B, N, 4]。
+          masks : 要嵌入的掩码，形状[B, 1, 4*embed_H, 4*embed_W]。
 
         Returns:
-          torch.Tensor: sparse embeddings for the points and boxes, with shape [B, N, embed_dim], 
-                        where N is determined by the number of input points and boxes.
-          torch.Tensor: dense embeddings for the masks, in the shape
+          torch.Tensor: 点和框的稀疏嵌入，形状[B, N, embed_dim]，
+                        其中N由输入点和框的数量决定。
+          torch.Tensor: 掩码的密集嵌入，形状
                         [B, embed_dim, embed_H, embed_W]
         """
         bs = self._get_batch_size(points, boxes, masks)

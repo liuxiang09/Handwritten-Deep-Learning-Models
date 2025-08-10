@@ -19,16 +19,14 @@ class Sam(nn.Module):
                  pixel_mean: List[float] = [123.675, 116.28, 103.53],
                  pixel_std: List[float] = [58.395, 57.12, 57.375]):
         """
-        SAM predicts object masks from an image and input prompts.
+        SAM从图像和输入提示预测对象掩码。
 
         Arguments:
-          image_encoder (ImageEncoderViT): The backbone used to encode the
-            image into image embeddings that allow for efficient mask prediction.
-          prompt_encoder (PromptEncoder): Encodes various types of input prompts.
-          mask_decoder (MaskDecoder): Predicts masks from the image embeddings
-            and encoded prompts.
-          pixel_mean (list(float)): Mean values for normalizing pixels in the input image.
-          pixel_std (list(float)): Std values for normalizing pixels in the input image.
+          image_encoder (ImageEncoderViT): 用于将图像编码为图像嵌入的主干网络，以便高效进行掩码预测。
+          prompt_encoder (PromptEncoder): 编码各种类型的输入提示。
+          mask_decoder (MaskDecoder): 从图像嵌入和编码的提示预测掩码。
+          pixel_mean (list(float)): 用于归一化输入图像像素的均值。
+          pixel_std (list(float)): 用于归一化输入图像像素的标准差。
         """
         super().__init__()
         self.image_encoder = image_encoder
@@ -44,11 +42,11 @@ class Sam(nn.Module):
 
     def preprocess(self,
                    x: torch.Tensor) -> torch.Tensor:
-        """Normalize pixel values and pad to a square input."""
-        # Normalize colors
+        """归一化像素值并填充为正方形输入。"""
+        # 归一化颜色
         x = (x - self.pixel_mean) / self.pixel_std
         
-        # Pad to size of 1024x1024
+        # 填充到1024x1024大小
         h, w = x.shape[-2:]
         padh = self.image_encoder.image_size - h
         padw = self.image_encoder.image_size - w
@@ -60,19 +58,19 @@ class Sam(nn.Module):
                           input_size: Tuple[int, int],
                           original_size: Tuple[int, int]) -> torch.Tensor:
         """
-        Remove padding and upscale masks to the original image size.
+        移除填充并将掩码上采样到原始图像大小。
 
         Arguments:
-          masks (torch.Tensor): Batched masks from the mask_decoder,
-            in BxCxHxW format.
-          input_size (tuple(int, int)): The size of the image input to the
-            model, in (H, W) format. Used to remove padding.
-          original_size (tuple(int, int)): The original size of the image
-            before resizing for input to the model, in (H, W) format.
+          masks (torch.Tensor): 来自mask_decoder的批量掩码，
+            格式为BxCxHxW。
+          input_size (tuple(int, int)): 输入到模型的图像大小，
+            格式为(H, W)。用于移除填充。
+          original_size (tuple(int, int)): 在调整大小输入到模型之前的原始图像大小，
+            格式为(H, W)。
 
         Returns:
-          (torch.Tensor): Batched masks in BxCxHxW format, where (H, W)
-            is given by original_size.
+          (torch.Tensor): 格式为BxCxHxW的批量掩码，其中(H, W)
+            由original_size给出。
         """
         masks = F.interpolate(
             masks,
@@ -94,42 +92,38 @@ class Sam(nn.Module):
                 batched_input: List[Dict[str, Any]],
                 multimask_output: bool = False) -> List[Dict[str, torch.Tensor]]:
         """
-        Predicts masks end-to-end from provided images and prompts.
-        If prompts are not known in advance, using SamPredictor is
-        recommended over calling the model directly.
+        从提供的图像和提示端到端预测掩码。
+        如果提示事先未知，建议使用SamPredictor而不是直接调用模型。
 
         Arguments:
-          batched_input (list(dict)): A list over input images, each a
-            dictionary with the following keys. A prompt key can be
-            excluded if it is not present.
-              'image': The image as a torch tensor in 3xHxW format,
-                already transformed for input to the model.
-              'original_size': (tuple(int, int)) The original size of
-                the image before transformation, as (H, W).
-              'point_coords': (torch.Tensor) Batched point prompts for
-                this image, with shape BxNx2. Already transformed to the
-                input frame of the model.
-              'point_labels': (torch.Tensor) Batched labels for point prompts,
-                with shape BxN.
-              'boxes': (torch.Tensor) Batched box inputs, with shape Bx4.
-                Already transformed to the input frame of the model.
-              'mask_inputs': (torch.Tensor) Batched mask inputs to the model,
-                in the form Bx1xHxW.
-          multimask_output (bool): Whether the model should predict multiple
-            disambiguating masks, or return a single mask.
+          batched_input (list(dict)): 输入图像列表，每个都是
+            具有以下键的字典。如果不存在，可以排除提示键。
+              'image': 作为torch张量的图像，格式为3xHxW，
+                已为输入到模型进行转换。
+              'original_size': (tuple(int, int)) 转换前的原始图像大小，
+                格式为(H, W)。
+              'point_coords': (torch.Tensor) 此图像的批量点提示，
+                形状为BxNx2。已转换到模型的输入框架。
+              'point_labels': (torch.Tensor) 点提示的批量标签，
+                形状为BxN。
+              'boxes': (torch.Tensor) 批量框输入，形状为Bx4。
+                已转换到模型的输入框架。
+              'mask_inputs': (torch.Tensor) 模型的批量掩码输入，
+                格式为Bx1xHxW。
+          multimask_output (bool): 模型是否应预测多个消歧掩码，
+            或返回单个掩码。
 
         Returns:
-          (list(dict)): A list over input images, where each element is
-            as dictionary with the following keys.
-              'masks': (torch.Tensor) Batched binary mask predictions,
-                with shape BxCxHxW, where B is the number of input prompts,
-                C is determined by multimask_output, and (H, W) is the
-                original size of the image.
-              'iou_predictions': (torch.Tensor) The model's predictions
-                of mask quality, in shape BxC.
-              'low_res_logits': (torch.Tensor) Low resolution logits with
-                shape BxCxHxW, where H=W=256. Can be passed as mask input
-                to subsequent iterations of prediction.
+          (list(dict)): 输入图像列表，其中每个元素是
+            具有以下键的字典。
+              'masks': (torch.Tensor) 批量二进制掩码预测，
+                形状为BxCxHxW，其中B是输入提示数量，
+                C由multimask_output确定，(H, W)是原始图像大小。
+              'iou_predictions': (torch.Tensor) 模型对掩码质量的预测，
+                形状为BxC。
+              'low_res_logits': (torch.Tensor) 低分辨率logits，
+                形状为BxCxHxW，其中H=W=256。可以作为掩码输入
+                传递给后续预测迭代。
         """
         input_images = torch.stack([self.preprocess(x['image']) for x in batched_input], dim=0)
         image_embeddings = self.image_encoder(input_images)
