@@ -1,5 +1,4 @@
-﻿#!/usr/bin/env python3
-"""
+﻿"""
 GPU 和系统环境测试脚本
 功能：测试GPU性能、内存使用、CUDA环境等
 作者：PyTorch环境测试

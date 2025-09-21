@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Python环境和依赖包检查脚本
 功能：检查Python环境、CUDA环境、关键包版本、兼容性等
