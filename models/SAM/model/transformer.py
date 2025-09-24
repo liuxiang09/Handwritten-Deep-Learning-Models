@@ -155,22 +155,25 @@ class TwoWayAttentionBlock(nn.Module):
     
 
 class TwoWayTransformer(nn.Module):
-    def __init__(self,
-                 depth: int,
-                 embedding_dim: int,
-                 num_heads: int,
-                 mlp_dim: int = 2048,
-                 activation: Type[nn.Module] = nn.ReLU,
-                 attention_downsample_rate: int = 2):
+    def __init__(
+        self,
+        depth: int,
+        embedding_dim: int,
+        num_heads: int,
+        mlp_dim: int = 2048,
+        activation: Type[nn.Module] = nn.ReLU,
+        attention_downsample_rate: int = 2,
+    ) -> None:
         """
         一个Transformer解码器，使用提供位置嵌入的查询来关注输入图像。
 
         Args:
           depth (int): Transformer的层数
           embedding_dim (int): 输入嵌入的通道维度
-          num_heads (int): 多头注意力的头数。必须能整除embedding_dim
+          num_heads (int): 多头注意力的头数，需整除 embedding_dim
           mlp_dim (int): MLP块内部的通道维度
           activation (nn.Module): MLP块中使用的激活函数
+          attention_downsample_rate (int): 注意力通道下采样率
         """
         super().__init__()
         self.depth = depth
@@ -187,33 +190,27 @@ class TwoWayTransformer(nn.Module):
                     mlp_dim=self.mlp_dim,
                     activation=activation,
                     attention_downsample_rate=attention_downsample_rate,
-                    skip_first_layer_pe=(i == 0) # 跳过第一个块的第一层PE
+                    skip_first_layer_pe=(i == 0),  # 跳过第一个块的第一层PE
                 )
             )
-        
+
+        # 最终注意力与归一化
         self.final_attn_token_to_image = Attention(
             embedding_dim=self.embedding_dim,
             num_heads=self.num_heads,
-            downsample_rate=attention_downsample_rate
+            downsample_rate=attention_downsample_rate,
         )
-        self.final_norm = nn.LayerNorm(self.embedding_dim)
+        # 与检查点命名对齐：norm_final_attn
+        self.norm_final_attn = nn.LayerNorm(self.embedding_dim)
 
-    def forward(self,
-                image_embedding: Tensor,
-                image_pe: Tensor,
-                point_embedding: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self,
+        image_embedding: Tensor,
+        image_pe: Tensor,
+        point_embedding: Tensor,
+    ) -> Tuple[Tensor, Tensor]:
         """
-        Args:
-          image_embedding (torch.Tensor): 要关注的图像。应为任意h和w的形状
-            B x embedding_dim x h x w。
-          image_pe (torch.Tensor): 要添加到图像的位置编码。必须
-            与image_embedding具有相同的形状。
-          point_embedding (torch.Tensor): 要添加到查询点的嵌入。
-            对于任意N_points，必须具有形状B x N_points x embedding_dim。
-
-        Returns:
-          torch.Tensor: 处理后的point_embedding
-          torch.Tensor: 处理后的image_embedding
+        Returns processed point embeddings and image embeddings.
         """
         # [B, embedding_dim, h, w] -> [B, h*w, embedding_dim]
         bs, c, h, w = image_embedding.shape
@@ -223,16 +220,16 @@ class TwoWayTransformer(nn.Module):
         # 准备查询和键
         queries = point_embedding
         keys = image_embedding
-        
-        # 应用Transformer块和最终层归一化
+
+        # 逐层交互
         for layer in self.layers:
             queries, keys = layer(queries, keys, query_pe=point_embedding, key_pe=image_pe)
 
-        # 从点到图像应用最终注意力层
+        # 最终从点到图像的注意力
         q = queries + point_embedding
         k = keys + image_pe
         attn_out = self.final_attn_token_to_image(q=q, k=k, v=keys)
-        queries = attn_out + queries  # 残差连接
-        queries = self.final_norm(queries)
+        queries = attn_out + queries  # 残差
+        queries = self.norm_final_attn(queries)
 
-        return queries, keys  # queries是处理后的点嵌入，keys是处理后的图像嵌入
+        return queries, keys
